@@ -1,75 +1,60 @@
-# Nuxt Minimal Starter
+# Web3 Dashboard
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A multi-chain Web3 wallet dashboard built with Nuxt 4, wagmi, viem, and Reown (WalletConnect).
+
+## Features
+
+- 🔗 **Multi-chain Support**: Ethereum, Polygon, Arbitrum, Base (mainnets + testnets)
+- 👛 **Wallet Connection**: Connect via WalletConnect, MetaMask, Coinbase, and more
+- 💰 **Token Balances**: View ERC20 token balances across chains
+- 🌐 **Network Switching**: Easy switching between supported networks
+- 📱 **Responsive Design**: Desktop sidebar, mobile bottom navigation
+
+## Tech Stack
+
+- **Framework**: Nuxt 4
+- **Web3**: wagmi, viem, @reown/appkit
+- **State**: @tanstack/vue-query
+- **Styling**: CSS Variables, custom dark theme
 
 ## Setup
 
-Make sure to install dependencies:
+### 1. Install Dependencies
 
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
+### 2. Configure Environment Variables
 
-Start the development server on `http://localhost:3000`:
+Create a `.env` file in the project root:
 
-```bash
-# npm
-npm run dev
+```env
+# Reown (WalletConnect) Project ID - REQUIRED
+# Get yours at https://cloud.reown.com
+NUXT_REOWN_PROJECT_ID=your_project_id_here
 
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+# Alchemy API Key (optional, for enhanced RPC)
+# Get yours at https://alchemy.com
+NUXT_ALCHEMY_API_KEY=your_alchemy_key_here
 ```
 
-## Production
+## Supported Networks
 
-Build the application for production:
+| Network          | Chain ID  | Type    |
+|------------------|-----------|---------|
+| Ethereum Mainnet | 1         | Mainnet |
+| Sepolia          | 11155111  | Testnet |
+| Polygon          | 137       | Mainnet |
+| Polygon Amoy     | 80002     | Testnet |
+| Arbitrum One     | 42161     | Mainnet |
+| Arbitrum Sepolia | 421614    | Testnet |
+| Base             | 8453      | Mainnet |
+| Base Sepolia     | 84532     | Testnet |
 
-```bash
-# npm
-npm run build
 
-# pnpm
-pnpm build
+Token balances are fetched directly from the blockchain using viem's public clients.
 
-# yarn
-yarn build
+## License
 
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+MIT
