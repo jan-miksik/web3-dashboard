@@ -178,7 +178,6 @@ function handleClearWatch() {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 12px;
 }
 
 .watch-section {
@@ -202,7 +201,6 @@ function handleClearWatch() {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 8px 0;
 }
 
 .divider::before {

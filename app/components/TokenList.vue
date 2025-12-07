@@ -35,6 +35,32 @@ const selectedChainIds = ref<Set<number>>(new Set()) // Empty set = all chains
 const showChainFilter = ref(false)
 const chainFilterRef = ref<HTMLElement | null>(null)
 const isRefreshing = ref(false)
+const copiedAddress = ref<string | null>(null)
+let copyTimeout: ReturnType<typeof setTimeout> | null = null
+
+function shortenAddress(address: string): string {
+  if (!address) return ''
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+async function copyTokenAddress(address: string) {
+  try {
+    await navigator.clipboard.writeText(address)
+    copiedAddress.value = address
+    
+    // Clear any existing timeout
+    if (copyTimeout) {
+      clearTimeout(copyTimeout)
+    }
+    
+    // Reset after 2 seconds
+    copyTimeout = setTimeout(() => {
+      copiedAddress.value = null
+    }, 2000)
+  } catch (error) {
+    console.error('Failed to copy address:', error)
+  }
+}
 
 async function handleRefresh() {
   isRefreshing.value = true
@@ -183,7 +209,7 @@ function formatTotalValue(value: number): string {
   <div class="card token-list">
     <div class="card-header">
       <div class="header-title-section">
-        <h3 class="card-title">Token Balances</h3>
+        <h3 class="card-title">Net Worth</h3>
         <span v-if="hasAddress && filteredTotalUsdValue > 0" class="total-value">
           {{ formatTotalValue(filteredTotalUsdValue) }}
         </span>
@@ -292,7 +318,25 @@ function formatTotalValue(value: number): string {
                   <span v-else class="token-placeholder">{{ token.symbol.charAt(0) }}</span>
                 </div>
                 <div class="token-details">
-                  <span class="token-symbol">{{ token.symbol }}</span>
+                  <div class="token-symbol-row">
+                    <span class="token-symbol">{{ token.symbol }}</span>
+                    <button 
+                      v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
+                      class="token-address-btn"
+                      :class="{ copied: copiedAddress === token.address }"
+                      :title="copiedAddress === token.address ? 'Copied!' : 'Copy contract address'"
+                      @click="copyTokenAddress(token.address)"
+                    >
+                      <span class="token-address">{{ shortenAddress(token.address) }}</span>
+                      <svg v-if="copiedAddress === token.address" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <svg v-else class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+                        <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+                      </svg>
+                    </button>
+                  </div>
                   <span class="token-meta">
                     <span class="token-name">{{ token.name }}</span>
                     <span class="chain-badge">{{ token.chainName }}</span>
@@ -340,13 +384,31 @@ function formatTotalValue(value: number): string {
                     >
                     <span v-else class="token-placeholder">{{ token.symbol.charAt(0) }}</span>
                   </div>
-                  <div class="token-details">
+                <div class="token-details">
+                  <div class="token-symbol-row">
                     <span class="token-symbol">{{ token.symbol }}</span>
-                    <span class="token-meta">
-                      <span class="token-name">{{ token.name }}</span>
-                      <span class="chain-badge">{{ token.chainName }}</span>
-                    </span>
+                    <button 
+                      v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
+                      class="token-address-btn"
+                      :class="{ copied: copiedAddress === token.address }"
+                      :title="copiedAddress === token.address ? 'Copied!' : 'Copy contract address'"
+                      @click="copyTokenAddress(token.address)"
+                    >
+                      <span class="token-address">{{ shortenAddress(token.address) }}</span>
+                      <svg v-if="copiedAddress === token.address" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <svg v-else class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+                        <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+                      </svg>
+                    </button>
                   </div>
+                  <span class="token-meta">
+                    <span class="token-name">{{ token.name }}</span>
+                    <span class="chain-badge">{{ token.chainName }}</span>
+                  </span>
+                </div>
                 </div>
               </td>
               <td class="td-value">
@@ -378,8 +440,7 @@ function formatTotalValue(value: number): string {
 
 .header-title-section {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
 }
 
 .total-value {
@@ -674,7 +735,7 @@ function formatTotalValue(value: number): string {
 /* Token Table */
 .table-container {
   overflow-x: auto;
-  margin: 0 -20px;
+  margin: 20px -20px;
   padding: 0 20px;
   transition: opacity 0.3s ease;
 }
@@ -730,7 +791,7 @@ function formatTotalValue(value: number): string {
 }
 
 .td-token {
-  width: 50%;
+  width: 60%;
 }
 
 .td-value {
@@ -781,10 +842,69 @@ function formatTotalValue(value: number): string {
   gap: 4px;
 }
 
+.token-symbol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .token-symbol {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 15px;
+}
+
+.token-address-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-mono);
+}
+
+.token-address-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+
+.token-address-btn.copied {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.token-address {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.token-address-btn.copied .token-address {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.token-address-btn .copy-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.token-address-btn:hover .copy-icon {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.token-address-btn.copied .copy-icon {
+  color: var(--success);
+  opacity: 1;
 }
 
 .token-meta {

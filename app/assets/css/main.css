@@ -118,7 +118,7 @@ button {
 }
 
 .card-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;

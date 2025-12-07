@@ -25,6 +25,11 @@ const isWatchMode = computed(() => !isConnected.value && !!watchedAddress.value)
 const isCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
 
+function shortenAddress(address: string): string {
+  if (!address) return ''
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
 async function copyAddress() {
   if (effectiveAddress.value) {
     try {
@@ -61,7 +66,6 @@ async function copyAddress() {
 
     <div v-if="isConnected || isWatchMode" class="wallet-details">
       <div class="detail-row">
-        <span class="detail-label">Address</span>
         <div class="address-container">
           <span class="detail-value font-mono address-full">{{ effectiveAddress }}</span>
           <span class="detail-value font-mono address-short">{{ shortAddress }}</span>
@@ -71,14 +75,15 @@ async function copyAddress() {
             :title="isCopied ? 'Copied!' : 'Copy address'" 
             @click="copyAddress"
           >
-            <svg v-if="!isCopied" class="copy-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <span class="address-short-display address-display-full">{{ effectiveAddress }}</span>
+            <span class="address-short-display address-display-short">{{ shortAddress }}</span>
+            <svg v-if="!isCopied" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
               <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
             </svg>
-            <svg v-else class="copy-icon check-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg v-else class="copy-icon check-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span class="copied-text" :class="{ visible: isCopied }">Copied!</span>
           </button>
         </div>
       </div>
@@ -99,7 +104,7 @@ async function copyAddress() {
 
 <style scoped>
 .wallet-info {
-  min-height: 160px;
+  min-height: 120px;
 }
 
 .status-badge {
@@ -155,23 +160,28 @@ async function copyAddress() {
   min-width: 0; /* Allows flex items to shrink */
 }
 
-.address-full {
+.address-full,
+.address-short {
+  display: none;
+}
+
+.address-display-full {
   display: none;
   word-break: break-all;
   overflow-wrap: anywhere;
 }
 
-.address-short {
+.address-display-short {
   display: inline-block;
 }
 
 /* Show full address on desktop, hide short */
 @media (min-width: 768px) {
-  .address-full {
+  .address-display-full {
     display: inline-block;
   }
   
-  .address-short {
+  .address-display-short {
     display: none;
   }
 }
@@ -179,18 +189,15 @@ async function copyAddress() {
 .copy-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: transparent;
+  gap: 4px;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   cursor: pointer;
-  padding: 6px;
-  min-width: 32px;
-  height: 32px;
+  padding: 4px 8px;
   border-radius: 6px;
   transition: all 0.2s ease;
-  position: relative;
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .copy-btn:hover {
@@ -204,21 +211,35 @@ async function copyAddress() {
   color: var(--success);
 }
 
+.address-short-display {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.copy-btn.copied .address-short-display {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .copy-icon {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   display: block;
   transition: all 0.2s ease;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .copy-btn:hover .copy-icon {
-  color: var(--text-primary);
+  color: var(--text-secondary);
+  opacity: 1;
 }
 
 .copy-btn.copied .copy-icon {
   color: var(--success);
+  opacity: 1;
 }
 
 .check-icon {
@@ -236,43 +257,6 @@ async function copyAddress() {
   100% {
     transform: scale(1);
     opacity: 1;
-  }
-}
-
-.copied-text {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--success);
-  background: var(--success-muted);
-  padding: 4px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-8px) scale(0.9);
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
-}
-
-.copied-text.visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  animation: copiedPulse 0.6s ease;
-}
-
-@keyframes copiedPulse {
-  0% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(0) scale(1.05);
-  }
-  100% {
-    transform: translateY(0) scale(1);
   }
 }
 
