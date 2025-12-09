@@ -9,7 +9,7 @@ export interface ChainMetadata {
   bgColor: string
 }
 
-// Chain icons from chainlist.org (reliable CDN source)
+// Chain icons from llamao.fi (reliable CDN source)
 const CHAIN_ICONS: Record<number, string> = {
   1: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg',
   137: 'https://icons.llamao.fi/icons/chains/rsz_polygon.jpg',

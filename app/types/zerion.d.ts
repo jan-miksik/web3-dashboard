@@ -35,7 +35,7 @@ export interface ZerionImplementation {
 export interface ZerionFungibleInfo {
   name?: string
   symbol?: string
-  icon?: ZerionIcon
+  icon?: ZerionIcon | null
   flags?: ZerionFlags
   implementations?: ZerionImplementation[]
   decimals?: number
@@ -59,12 +59,12 @@ export interface ZerionPositionAttributes {
   name?: string
   position_type?: string
   quantity?: ZerionQuantity
-  price?: number | ZerionPrice
-  value?: number | ZerionValue
+  price?: number | ZerionPrice | null
+  value?: number | ZerionValue | null
   changes?: {
     absolute_1d?: number
     percent_1d?: number
-  }
+  } | null
   fungible_info?: ZerionFungibleInfo
   flags?: ZerionFlags
   updated_at?: string
@@ -94,6 +94,8 @@ export interface ZerionApiResponse {
   included?: ZerionIncludedItem[]
   links?: {
     self?: string
+    next?: string
+    prev?: string
   }
   status?: number
   message?: string

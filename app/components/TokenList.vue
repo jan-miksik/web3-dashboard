@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTokens } from '~/composables/useTokens'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
-import { CHAIN_METADATA, getChainMetadata } from '~/utils/chains'
+import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
 
 // Get available chains from tokens
@@ -111,6 +111,24 @@ const filteredTotalUsdValue = computed(() => {
 const hasLowValueAssets = computed(() => {
   return lowValueTokens.value.length > 0
 })
+
+// Auto-show low-value assets if high-value tokens are empty (button would not be visible)
+// This ensures assets below $5 are shown when there are no high-value tokens
+watch([tokens, selectedChainIds], () => {
+  const hasHighValue = tokens.value.some(token => {
+    const matchesChain = selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
+    return matchesChain && token.usdValue >= 5
+  })
+  const hasLowValue = tokens.value.some(token => {
+    const matchesChain = selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
+    return matchesChain && token.usdValue > 0 && token.usdValue < 5
+  })
+  
+  // If no high-value tokens but there are low-value tokens, auto-show them
+  if (!hasHighValue && hasLowValue && !showLowValueAssets.value) {
+    showLowValueAssets.value = true
+  }
+}, { immediate: true, deep: true })
 
 const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 0) {
@@ -334,7 +352,16 @@ function formatTotalValue(value: number): string {
                   </div>
                   <span class="token-meta">
                     <span class="token-name">{{ token.name }}</span>
-                    <span class="chain-badge">{{ token.chainName }}</span>
+                    <span class="chain-badge-wrapper">
+                      <img 
+                        v-if="getChainIcon(token.chainId)" 
+                        :src="getChainIcon(token.chainId)" 
+                        :alt="token.chainName"
+                        class="chain-badge-icon"
+                        @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                      >
+                      <span class="chain-badge">{{ token.chainName }}</span>
+                    </span>
                   </span>
                 </div>
               </div>
@@ -401,7 +428,16 @@ function formatTotalValue(value: number): string {
                   </div>
                   <span class="token-meta">
                     <span class="token-name">{{ token.name }}</span>
-                    <span class="chain-badge">{{ token.chainName }}</span>
+                    <span class="chain-badge-wrapper">
+                      <img 
+                        v-if="getChainIcon(token.chainId)" 
+                        :src="getChainIcon(token.chainId)" 
+                        :alt="token.chainName"
+                        class="chain-badge-icon"
+                        @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                      >
+                      <span class="chain-badge">{{ token.chainName }}</span>
+                    </span>
                   </span>
                 </div>
                 </div>
@@ -649,6 +685,12 @@ function formatTotalValue(value: number): string {
   flex-direction: column;
   padding: 4px;
   min-width: 200px;
+}
+
+@media (min-width: 1024px) {
+  .network-filter-dropdown {
+    max-height: 600px;
+  }
 }
 
 .filter-option {
@@ -927,6 +969,20 @@ function formatTotalValue(value: number): string {
 .token-name {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.chain-badge-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chain-badge-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .chain-badge {

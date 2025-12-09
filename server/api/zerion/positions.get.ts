@@ -1,5 +1,6 @@
-import type { ZerionApiResponse } from '~/types/zerion'
+import type { ZerionApiResponse, ZerionPosition, ZerionIncludedItem } from '~/types/zerion'
 import { CHAIN_ID_TO_ZERION } from '~/utils/chains'
+import { ZerionApiResponseSchema } from '~/utils/zerion-schema'
 
 // Zerion API base URL
 const ZERION_API_BASE = 'https://api.zerion.io/v1'
@@ -45,24 +46,25 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
   // Zerion API endpoint for wallet positions
   const apiUrl = `${ZERION_API_BASE}/wallets/${walletAddress}/positions/`
 
-  // Build query parameters
-  const params = new URLSearchParams()
+  // Build base query parameters
+  const baseParams = new URLSearchParams()
   
   // Add chain filter if we have supported chains
   if (zerionChainIds.length > 0) {
     zerionChainIds.forEach(chainId => {
-      params.append('filter[chain_ids]', chainId)
+      baseParams.append('filter[chain_ids]', chainId)
     })
   }
   
   // Filter for fungible assets only (tokens, not NFTs or protocol positions)
-  params.append('filter[asset_types]', 'fungible')
+  baseParams.append('filter[asset_types]', 'fungible')
   
-  // Pagination
-  params.append('page[size]', '100')
+  // Pagination - set page size
+  baseParams.append('page[size]', '100')
 
-  try {
-    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+  // Helper function to fetch a single page
+  async function fetchPage(url: string): Promise<ZerionApiResponse> {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': getAuthHeader(apiKey),
@@ -87,8 +89,89 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
       })
     }
 
-    const data = await response.json() as ZerionApiResponse
-    return data
+    // Parse JSON response
+    let jsonData: unknown
+    try {
+      jsonData = await response.json()
+    } catch (parseError) {
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'Failed to parse Zerion API response as JSON',
+      })
+    }
+
+    // Validate response structure with Zod
+    const validationResult = ZerionApiResponseSchema.safeParse(jsonData)
+    
+    if (!validationResult.success) {
+      const errorDetails = validationResult.error.issues
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join('; ')
+      throw createError({
+        statusCode: 502,
+        statusMessage: `Invalid Zerion API response structure: ${errorDetails}`,
+      })
+    }
+
+    return validationResult.data
+  }
+
+  try {
+    // Aggregate all pages
+    const allData: ZerionPosition[] = []
+    const allIncluded: ZerionIncludedItem[] = []
+    let nextPageUrl: string | null = null
+    let currentUrl = `${apiUrl}?${baseParams.toString()}`
+    let pageCount = 0
+    const maxPages = 100 // Safety limit to prevent infinite loops
+
+    do {
+      // Fetch current page
+      const pageResponse = await fetchPage(currentUrl)
+      
+      // Handle 202 status (portfolio being prepared)
+      if (pageResponse.status === 202) {
+        return {
+          data: [],
+          status: 202,
+          message: 'Portfolio is being prepared',
+        }
+      }
+
+      // Aggregate data and included items
+      if (pageResponse.data) {
+        allData.push(...pageResponse.data)
+      }
+      if (pageResponse.included) {
+        allIncluded.push(...pageResponse.included)
+      }
+
+      // Check for next page
+      nextPageUrl = pageResponse.links?.next || null
+      if (nextPageUrl) {
+        currentUrl = nextPageUrl
+        pageCount++
+        
+        // Safety check to prevent infinite loops
+        if (pageCount >= maxPages) {
+          console.warn(`Reached maximum page limit (${maxPages}) for wallet ${walletAddress}`)
+          break
+        }
+
+        // Small delay between requests to respect rate limits
+        // Wait 100ms between paginated requests
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    } while (nextPageUrl)
+
+    // Return aggregated response
+    return {
+      data: allData,
+      included: allIncluded,
+      links: {
+        self: `${apiUrl}?${baseParams.toString()}`,
+      },
+    }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'statusCode' in error) {
       throw error

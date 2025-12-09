@@ -141,7 +141,8 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
         if (quantity.float !== undefined && quantity.float !== null) {
           balanceFloat = quantity.float
         } else if (quantity.numeric !== undefined && quantity.numeric !== null) {
-          balanceFloat = parseFloat(quantity.numeric)
+          const parsed = parseFloat(quantity.numeric)
+          balanceFloat = Number.isNaN(parsed) ? 0 : parsed
         }
         
         if (quantity.int !== undefined && quantity.int !== null) {

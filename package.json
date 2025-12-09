@@ -22,7 +22,8 @@
     "nuxt": "^4.2.1",
     "viem": "^2.41.2",
     "vue": "^3.5.25",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.3",
+    "zod": "^4.1.13"
   },
   "packageManager": "pnpm@10.7.1+sha1.11ea2eb2e09f608614c62db024375b462aa3d861",
   "devDependencies": {
