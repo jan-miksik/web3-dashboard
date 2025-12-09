@@ -3,31 +3,17 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useTokens } from '~/composables/useTokens'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
-// Chain metadata with L1/L2 indicators
-// Must correspond with chains in chains-config.ts
-interface ChainInfo {
-  id: number
-  name: string
-  type: 'L1' | 'L2'
-}
+import { CHAIN_METADATA, getChainMetadata } from '~/utils/chains'
+import type { ChainMetadata } from '~/utils/chains'
 
-const CHAINS: ChainInfo[] = [
-  // Mainnets (from chains-config.ts lines 4-8)
-  { id: 1, name: 'Ethereum', type: 'L1' },
-  { id: 8453, name: 'Base', type: 'L2' },
-  { id: 42161, name: 'Arbitrum', type: 'L2' },
-  { id: 10, name: 'Optimism', type: 'L2' },
-  { id: 137, name: 'Polygon', type: 'L1' },
-  // Testnets (from chains-config.ts lines 11-15)
-  { id: 11155111, name: 'Sepolia', type: 'L1' },
-  { id: 84532, name: 'Base Sepolia', type: 'L2' },
-  { id: 11155420, name: 'Optimism Sepolia', type: 'L2' },
-  { id: 421614, name: 'Arbitrum Sepolia', type: 'L2' },
-  { id: 80002, name: 'Polygon Amoy', type: 'L1' },
-]
+// Get available chains from tokens
+const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
+  return CHAIN_METADATA.filter(chain => chainIds.has(chain.id))
+}
 
 const { tokens, isLoading, error, refetch, isConnected, totalUsdValue } = useTokens()
 const { watchedAddress } = useWatchedAddress()
+
 
 const hasAddress = computed(() => isConnected.value || !!watchedAddress.value)
 const showLowValueAssets = ref(false)
@@ -76,7 +62,7 @@ async function handleRefresh() {
 // Get available chains from tokens
 const availableChains = computed(() => {
   const chainIds = new Set(tokens.value.map(t => t.chainId))
-  return CHAINS.filter(chain => chainIds.has(chain.id))
+  return getAvailableChains(chainIds)
 })
 
 // Separate tokens into high-value and low-value
@@ -154,8 +140,8 @@ function isChainSelected(chainId: number): boolean {
   return selectedChainIds.value.has(chainId)
 }
 
-function getChainInfo(chainId: number): ChainInfo | undefined {
-  return CHAINS.find(c => c.id === chainId)
+function getChainInfo(chainId: number): ChainMetadata | undefined {
+  return getChainMetadata(chainId)
 }
 
 // Close filter when clicking outside
@@ -242,7 +228,16 @@ function formatTotalValue(value: number): string {
                 :class="{ selected: isChainSelected(chain.id) }"
                 @click="toggleChain(chain.id)"
               >
-                <span class="option-name">{{ chain.name }}</span>
+                <div class="option-left">
+                  <img 
+                    v-if="chain.icon" 
+                    :src="chain.icon" 
+                    :alt="chain.name"
+                    class="chain-icon"
+                    @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  >
+                  <span class="option-name">{{ chain.name }}</span>
+                </div>
                 <div class="option-right">
                   <span class="chain-type" :class="chain.type.toLowerCase()">
                     {{ chain.type }}
@@ -701,23 +696,39 @@ function formatTotalValue(value: number): string {
   font-size: 14px;
 }
 
+.option-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.chain-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .chain-type {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 3px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  opacity: 0.6;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .chain-type.l1 {
-  background: var(--accent-muted);
-  color: var(--accent-primary);
+  opacity: 0.5;
 }
 
 .chain-type.l2 {
-  background: var(--success-muted);
-  color: var(--success);
+  opacity: 0.5;
 }
 
 /* Dropdown transitions */

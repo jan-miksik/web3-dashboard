@@ -10,6 +10,8 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@moralisweb3/common-core": "^2.27.2",
+    "@moralisweb3/evm-api": "^2.27.2",
     "@nuxt/eslint": "1.11.0",
     "@nuxt/image": "2.0.0",
     "@reown/appkit": "^1.8.14",

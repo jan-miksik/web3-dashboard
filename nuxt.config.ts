@@ -29,10 +29,12 @@ export default defineNuxtConfig({
 
   // Runtime config for environment variables
   runtimeConfig: {
+    // Server-side only (not exposed to client)
+    zerionApiKey: process.env.NUXT_ZERION_API_KEY || '',
+    
+    // Public (exposed to client)
     public: {
       reownProjectId: process.env.NUXT_REOWN_PROJECT_ID || '',
-      alchemyApiKey: process.env.NUXT_ALCHEMY_API_KEY || '',
-      ankrApiKey: process.env.NUXT_ANKR_API_KEY || '',
     },
   },
 

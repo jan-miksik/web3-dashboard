@@ -3,6 +3,14 @@ import { useQuery } from '@tanstack/vue-query'
 import { useConnection, useChainId } from '@wagmi/vue'
 import { config } from '~/chains-config'
 import { useWatchedAddress } from './useWatchedAddress'
+import { ZERION_TO_CHAIN_ID, getChainName } from '~/utils/chains'
+import type {
+  ZerionApiResponse,
+  ZerionPosition,
+  ZerionIncludedItem,
+  ZerionFungibleInfo,
+  ZerionImplementation,
+} from '~/types/zerion'
 
 // Token type definition
 export interface Token {
@@ -20,128 +28,237 @@ export interface Token {
   tokenType: 'native' | 'erc20'
 }
 
-// Chain ID to Ankr blockchain name mapping
-const CHAIN_TO_ANKR: Record<number, string> = {
-  1: 'eth',
-  137: 'polygon',
-  42161: 'arbitrum',
-  8453: 'base',
-  10: 'optimism',
-  43114: 'avalanche',
-  56: 'bsc',
-  250: 'fantom',
-}
-
-// Chain names for display
-const CHAIN_NAMES: Record<number, string> = {
-  1: 'Ethereum',
-  137: 'Polygon',
-  42161: 'Arbitrum',
-  8453: 'Base',
-  10: 'Optimism',
-  43114: 'Avalanche',
-  56: 'BSC',
-  250: 'Fantom',
-  11155111: 'Sepolia',
-  80002: 'Polygon Amoy',
-  421614: 'Arbitrum Sepolia',
-  84532: 'Base Sepolia',
-}
-
-// Ankr blockchain name to chain ID mapping
-const ANKR_TO_CHAIN_ID: Record<string, number> = {
-  'eth': 1,
-  'polygon': 137,
-  'arbitrum': 42161,
-  'base': 8453,
-  'optimism': 10,
-  'avalanche': 43114,
-  'bsc': 56,
-  'fantom': 250,
-}
-
-// Ankr API for multi-chain token balances
-// Get your free API key at https://www.ankr.com/rpc/
-const getAnkrApiUrl = () => {
-  const runtimeConfig = useRuntimeConfig()
-  const apiKey = runtimeConfig.public.ankrApiKey as string
-  if (apiKey) {
-    return `https://rpc.ankr.com/multichain/${apiKey}`
-  }
-  // Fallback to public endpoint (limited functionality)
-  return 'https://rpc.ankr.com/multichain'
-}
-
 // Fetch function for TanStack Query
+// Now calls our server API endpoint which securely handles the Zerion API key
 async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
-  // Get supported blockchains for the API call
-  const blockchains = Object.values(CHAIN_TO_ANKR)
-  const apiUrl = getAnkrApiUrl()
+  // Get supported chain IDs from our config
+  const supportedChainIds = config.chains.map(chain => chain.id)
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'ankr_getAccountBalance',
-      params: {
-        walletAddress,
-        blockchain: blockchains,
-        onlyWhitelisted: false,
-        pageSize: 100,
-      },
-      id: 1,
-    }),
+  // Build query parameters for our server API
+  const params = new URLSearchParams({
+    address: walletAddress,
+  })
+  
+  // Add chain IDs as query parameters
+  supportedChainIds.forEach(chainId => {
+    params.append('chainIds', String(chainId))
   })
 
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
+  // Call our server API endpoint
+  const response = await $fetch<ZerionApiResponse>(`/api/zerion/positions?${params.toString()}`, {
+    method: 'GET',
+  })
 
-  const data = await response.json()
-
-  if (data.error) {
-    throw new Error(data.error.message || 'Failed to fetch token balances')
-  }
-
-  if (!data.result?.assets || !Array.isArray(data.result.assets)) {
+  // Handle 202 status (portfolio being prepared)
+  if (response.status === 202) {
     return []
   }
 
-  // Transform Ankr response to our Token format
-  const fetchedTokens: Token[] = data.result.assets
-    .filter((asset: any) => {
-      // Filter out tokens with zero or very small balances
-      const balance = parseFloat(asset.balance || '0')
-      return balance > 0
-    })
-    .map((asset: any) => {
-      const chainId = ANKR_TO_CHAIN_ID[asset.blockchain] || 1
-      const balanceNum = parseFloat(asset.balance || '0')
-      const usdPrice = parseFloat(asset.tokenPrice || '0')
-      const usdValue = parseFloat(asset.balanceUsd || '0')
+  const data = response
 
-      return {
-        symbol: asset.tokenSymbol || 'UNKNOWN',
-        name: asset.tokenName || asset.tokenSymbol || 'Unknown Token',
-        address: asset.contractAddress || '0x0000000000000000000000000000000000000000',
-        decimals: asset.tokenDecimals || 18,
-        balance: asset.balanceRawInteger || '0',
-        formattedBalance: balanceNum.toLocaleString(undefined, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 6,
-        }),
-        logoURI: asset.thumbnail || undefined,
-        chainId,
-        chainName: CHAIN_NAMES[chainId] || asset.blockchain,
-        usdPrice,
-        usdValue,
-        tokenType: asset.tokenType === 'NATIVE' ? 'native' : 'erc20',
-      } as Token
+  // Debug: Log the response structure (only in development)
+  if (import.meta.dev) {
+    console.log('Zerion API Response:', JSON.stringify(data, null, 2))
+    console.log('Zerion API Response keys:', Object.keys(data))
+  }
+
+  // Handle Zerion API response structure
+  // Response format: { data: [...], included: [...] }
+  // Check multiple possible response structures
+  let positions: ZerionPosition[] = []
+  
+  // Try standard JSON:API format
+  if (Array.isArray(data.data)) {
+    positions = data.data
+  }
+  
+  if (!Array.isArray(positions) || positions.length === 0) {
+    if (import.meta.dev) {
+      console.log('Zerion API: No positions found in response')
+      console.log('Full response for debugging:', data)
+    }
+    return []
+  }
+
+  if (import.meta.dev) {
+    console.log(`Zerion API: Found ${positions.length} positions to process`)
+    if (positions.length > 0) {
+      console.log('Sample position structure:', positions[0])
+    }
+  }
+
+  // Cache included array for lookups
+  const included: ZerionIncludedItem[] = Array.isArray(data.included) ? data.included : []
+
+  // Transform Zerion response to our Token format
+  const fetchedTokens: Token[] = positions
+    .map((position: ZerionPosition): Token | null => {
+      try {
+        const attributes = position.attributes || {}
+        const quantity = attributes.quantity || {}
+        const price = attributes.price
+        const value = attributes.value
+        
+        // Get chain ID from relationships (JSON:API format: relationships.chain.data.id)
+        const chainId = position.relationships?.chain?.data?.id
+        if (!chainId) {
+          console.warn('Zerion API: Position missing chain ID:', position)
+          return null
+        }
+        
+        const numericChainId = ZERION_TO_CHAIN_ID[chainId]
+        if (!numericChainId) {
+          console.warn(`Zerion API: Unknown chain ID: ${chainId}`)
+          return null
+        }
+        
+        // Get fungible info from relationships or attributes
+        // Fungible info might be in relationships.fungible.data or included array
+        let fungibleInfo: ZerionFungibleInfo = attributes.fungible_info || {}
+        
+        // If fungible is in relationships, we might need to look it up from included array
+        const fungibleRelationship = position.relationships?.fungible
+        if (fungibleRelationship?.data) {
+          // Try to find fungible info from included array if available
+          const fungibleData = included.find((item: ZerionIncludedItem) => 
+            item.type === 'fungibles' && 
+            item.id === fungibleRelationship.data?.id
+          )
+          if (fungibleData?.attributes && 'symbol' in fungibleData.attributes) {
+            fungibleInfo = fungibleData.attributes as ZerionFungibleInfo
+          }
+        }
+        
+        // Extract token information
+        const symbol = fungibleInfo.symbol || attributes.name || 'UNKNOWN'
+        const name = fungibleInfo.name || attributes.name || symbol
+        const decimals = quantity.decimals ?? fungibleInfo.decimals ?? 18
+        
+        // Handle different quantity formats
+        let balanceFloat = 0
+        let balanceInt = '0'
+        
+        if (quantity.float !== undefined && quantity.float !== null) {
+          balanceFloat = quantity.float
+        } else if (quantity.numeric !== undefined && quantity.numeric !== null) {
+          balanceFloat = parseFloat(quantity.numeric)
+        }
+        
+        if (quantity.int !== undefined && quantity.int !== null) {
+          balanceInt = quantity.int
+        } else if (quantity.numeric !== undefined && quantity.numeric !== null) {
+          balanceInt = quantity.numeric
+        }
+        
+        // Handle price and value
+        // Price and value can be direct numbers or objects with float property
+        let usdPrice = 0
+        if (typeof price === 'number') {
+          usdPrice = price
+        } else if (price && typeof price === 'object' && 'float' in price && price.float !== undefined && price.float !== null) {
+          usdPrice = price.float
+        }
+        
+        let usdValue = 0
+        if (typeof value === 'number') {
+          usdValue = value
+        } else if (value && typeof value === 'object' && 'float' in value && value.float !== undefined && value.float !== null) {
+          usdValue = value.float
+        } else {
+          // Fallback: calculate from balance and price
+          usdValue = balanceFloat * usdPrice
+        }
+        
+        // Filter out positions with zero or very small balances
+        if (balanceFloat <= 0.000001) {
+          return null
+        }
+        
+        // Get token address from implementations or fungible relationship
+        // Zerion stores token implementations with chain_id and address
+        let address = ''
+        
+        // Try to get address from implementations
+        const implementations: ZerionImplementation[] = fungibleInfo.implementations || []
+        const implementation = implementations.find((impl: ZerionImplementation) => impl.chain_id === chainId)
+        if (implementation) {
+          // Address can be null for native tokens
+          address = implementation.address || ''
+        }
+        
+        // If not found, try to extract from fungible relationship
+        if (!address && fungibleRelationship?.data) {
+          const fungibleData = included.find((item: ZerionIncludedItem) => 
+            item.type === 'fungibles' && 
+            item.id === fungibleRelationship.data?.id
+          )
+          if (fungibleData?.attributes && 'implementations' in fungibleData.attributes) {
+            const impls = fungibleData.attributes.implementations as ZerionImplementation[]
+            if (Array.isArray(impls)) {
+              const impl = impls.find((impl: ZerionImplementation) => impl.chain_id === chainId)
+              if (impl?.address) {
+                address = impl.address
+              }
+            }
+          }
+        }
+        
+        // Check if it's a native token
+        // Native tokens have address: null in implementations (like ETH, MATIC, etc.)
+        const isNative = !address || 
+                        address === '0x0000000000000000000000000000000000000000' || 
+                        implementation?.address === null ||
+                        fungibleInfo.flags?.is_native === true ||
+                        // Native tokens often have position IDs like "base-ethereum-asset-asset" or "base-base-asset-asset"
+                        (position.id?.includes('-asset-asset') && !position.id?.match(/^0x[a-fA-F0-9]{40}/))
+        
+        // Set default address for native tokens
+        if (isNative && !address) {
+          address = '0x0000000000000000000000000000000000000000'
+        }
+        
+        // Get logo URL from icon (check both fungibleInfo and included fungible data)
+        let logoURI: string | undefined = fungibleInfo.icon?.url
+        if (!logoURI && fungibleRelationship?.data) {
+          const fungibleData = included.find((item: ZerionIncludedItem) => 
+            item.type === 'fungibles' && 
+            item.id === fungibleRelationship.data?.id
+          )
+          if (fungibleData?.attributes && 'icon' in fungibleData.attributes) {
+            const icon = fungibleData.attributes.icon as { url?: string }
+            if (icon?.url) {
+              logoURI = icon.url
+            }
+          }
+        }
+
+        return {
+          symbol,
+          name,
+          address,
+          decimals,
+          balance: balanceInt,
+          formattedBalance: balanceFloat.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 6,
+          }),
+          logoURI,
+        chainId: numericChainId,
+        chainName: getChainName(numericChainId),
+          usdPrice,
+          usdValue,
+          tokenType: isNative ? 'native' : 'erc20',
+        } as Token
+      } catch (error) {
+        console.error('Error transforming Zerion position:', error, position)
+        return null
+      }
     })
+    .filter((token): token is Token => token !== null)
+
+  if (import.meta.dev) {
+    console.log(`Zerion API: Transformed ${fetchedTokens.length} tokens from ${positions.length} positions`)
+  }
 
   return fetchedTokens
 }
@@ -184,7 +301,7 @@ export function useTokens() {
 
   const networkName = computed(() => {
     if (!currentChainId.value) return 'Unknown'
-    return CHAIN_NAMES[currentChainId.value] || `Chain ${currentChainId.value}`
+    return getChainName(currentChainId.value)
   })
 
   // Sorted tokens by USD value (descending), with connected chain tokens first for same value
