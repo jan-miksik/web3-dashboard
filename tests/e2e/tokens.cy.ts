@@ -1,9 +1,11 @@
+/// <reference types="cypress" />
+
 describe('Token Display E2E Tests', () => {
   beforeEach(() => {
     cy.visit('/')
   })
 
-  it('should show token list when wallet is connected', () => {
+  it.skip('should show token list when wallet is connected', () => {
     // This test would require a connected wallet
     // In a real scenario, you'd mock the wallet connection
     
@@ -12,7 +14,7 @@ describe('Token Display E2E Tests', () => {
     // cy.get('[data-testid="token-item"]').should('have.length.greaterThan', 0)
   })
 
-  it('should display token information correctly', () => {
+  it.skip('should display token information correctly', () => {
     // Test token display format
     // - Token symbol
     // - Token balance
@@ -20,24 +22,24 @@ describe('Token Display E2E Tests', () => {
     // - Chain information
   })
 
-  it('should handle empty token list', () => {
+  it.skip('should handle empty token list', () => {
     // Test when wallet has no tokens
     // Should show appropriate empty state
   })
 
-  it('should filter tokens by chain', () => {
+  it.skip('should filter tokens by chain', () => {
     // Test chain filtering functionality
   })
 
-  it('should sort tokens by value', () => {
+  it.skip('should sort tokens by value', () => {
     // Test token sorting (by USD value)
   })
 
-  it('should handle loading states', () => {
+  it.skip('should handle loading states', () => {
     // Test loading indicators while fetching tokens
   })
 
-  it('should handle error states', () => {
+  it.skip('should handle error states', () => {
     // Test error handling when API fails
     // Mock API failure and verify error message display
   })

@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 describe('Home Page E2E Tests', () => {
   beforeEach(() => {
     // Visit the home page before each test

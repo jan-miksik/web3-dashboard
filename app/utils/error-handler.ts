@@ -74,7 +74,7 @@ function getUserFriendlyMessage(error: unknown, customMessage?: string): string 
     }
 
     // Check error message for common patterns
-    const errorMessage = error.message.toLowerCase()
+    const errorMessage = error.message?.toLowerCase() || ''
     if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
       return ERROR_MESSAGES.NetworkError!
     }

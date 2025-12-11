@@ -5,12 +5,6 @@ import { useQuery } from '@tanstack/vue-query'
 import { useConnection } from '@wagmi/vue'
 import { useWatchedAddress } from '../../../app/composables/useWatchedAddress'
 
-// Extend global type to allow $fetch mock
-declare global {
-  // eslint-disable-next-line no-var
-  var $fetch: typeof globalThis.$fetch
-}
-
 // Mock dependencies
 vi.mock('@tanstack/vue-query', () => ({
   useQuery: vi.fn(),
@@ -51,13 +45,13 @@ vi.mock('../../../app/utils/chains', () => ({
 }))
 
 // Mock $fetch - Nuxt auto-import that needs to be mocked for tests
-// Create a mock that satisfies the $fetch interface with required properties
+// Use vi.stubGlobal to avoid circular type reference issues
 const mockFetchFn = vi.fn()
 const mockFetch = Object.assign(mockFetchFn, {
   raw: vi.fn(),
   create: vi.fn(),
-}) as typeof globalThis.$fetch
-global.$fetch = mockFetch
+})
+vi.stubGlobal('$fetch', mockFetch)
 
 describe('useTokens', () => {
   beforeEach(() => {

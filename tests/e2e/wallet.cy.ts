@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 describe('Wallet Functionality E2E Tests', () => {
   beforeEach(() => {
     cy.visit('/')
@@ -15,8 +17,7 @@ describe('Wallet Functionality E2E Tests', () => {
     cy.get('[data-testid="connect-button"]').click()
     
     // The modal might take a moment to appear
-    // Adjust selector based on your actual modal implementation
-    // cy.get('[data-testid="wallet-modal"]').should('be.visible')
+    cy.get('[data-testid="wallet-modal"]', { timeout: 5000 }).should('be.visible')
   })
 
   // Note: Actual wallet connection tests would require:
@@ -24,7 +25,7 @@ describe('Wallet Functionality E2E Tests', () => {
   // 2. Using Cypress plugins for Web3 interactions
   // 3. Setting up test wallets with known addresses
   
-  it('should handle wallet disconnection gracefully', () => {
+  it.skip('should handle wallet disconnection gracefully', () => {
     // This would test the disconnect flow
     // Implementation depends on your wallet integration
   })

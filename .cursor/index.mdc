@@ -72,6 +72,8 @@ alwaysApply: true
 - Example:
   ```typescript
   // ✅ Correct
+  import { handleError } from '~/utils/error-handler'
+  
   interface UserData {
     id: string
     name: string
@@ -81,7 +83,12 @@ alwaysApply: true
     if (isUserData(data)) {
       return data
     }
-    throw new Error('Invalid user data')
+    const error = new Error('Invalid user data')
+    handleError(error, {
+      message: 'Invalid user data',
+      context: { data },
+    })
+    throw error
   }
   
   // ❌ Wrong

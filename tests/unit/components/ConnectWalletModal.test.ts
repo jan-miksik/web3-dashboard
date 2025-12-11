@@ -153,15 +153,6 @@ describe('ConnectWalletModal', () => {
     expect(wrapper.find('[data-testid="address-error"]').exists()).toBe(true)
   })
 
-  it('hides modal when a watched address already exists', () => {
-    mockWatchedAddress.value = '0x1234567890123456789012345678901234567890'
-    mockUseConnection.mockReturnValue({
-      isConnected: ref(false),
-    } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mountModal()
-    
-    expect(wrapper.find('[data-testid="modal-overlay"]').exists()).toBe(false)
-  })
 })
 

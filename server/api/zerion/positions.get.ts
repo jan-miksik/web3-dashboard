@@ -21,8 +21,10 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
   return handlePositionsRequest(event, getRuntimeConfig)
 })
 
+import type { H3Event } from 'h3'
+
 export async function handlePositionsRequest(
-  event: any,
+  event: H3Event,
   getConfig: () => ReturnType<typeof useRuntimeConfig> = getRuntimeConfig
 ): Promise<ZerionApiResponse> {
   const query = getQuery(event)
@@ -166,8 +168,7 @@ export async function handlePositionsRequest(
         
         // Safety check to prevent infinite loops
         if (pageCount >= maxPages) {
-          // Note: Server-side logging - using logger would require importing client-side utils
-          // For server routes, we can use console.warn as it's server-side only
+          // Note: Using console.warn for server-side logging in this API route
           // eslint-disable-next-line no-console
           console.warn(`Reached maximum page limit (${maxPages}) for wallet ${walletAddress}`)
           break

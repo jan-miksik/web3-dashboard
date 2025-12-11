@@ -3,7 +3,7 @@
  * 
  * Provides consistent logging across the application with:
  * - Log levels (debug, info, warn, error)
- * - Environment-aware logging (only logs in dev/staging)
+ * - Environment-aware logging (debug/info in dev only, warn/error in all environments)
  * - Structured logging with context
  * - Automatic formatting
  */

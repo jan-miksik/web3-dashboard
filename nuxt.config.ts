@@ -35,6 +35,7 @@ export default defineNuxtConfig({
     // Public (exposed to client)
     public: {
       reownProjectId: process.env.NUXT_REOWN_PROJECT_ID || '',
+      appUrl: process.env.NUXT_APP_URL || process.env.APP_URL || '',
     },
   },
 
