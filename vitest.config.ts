@@ -9,17 +9,10 @@ export default defineVitestConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'tests/',
-        '.nuxt/',
-        'dist/',
-        'cypress/',
-        '**/*.config.*',
-        '**/types/**',
-      ],
+      exclude: ['node_modules/', 'tests/', '.nuxt/', 'dist/', '**/*.config.*', '**/types/**'],
+      // Include source files
+      include: ['app/**/*.{ts,vue}', 'server/**/*.ts'],
     },
     include: ['tests/unit/**/*.test.ts'],
   },
 })
-

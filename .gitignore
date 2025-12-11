@@ -36,9 +36,10 @@ coverage
 *.lcov
 .nyc_output
 
-# Cypress
-cypress/videos
-cypress/screenshots
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Local env files
 .env

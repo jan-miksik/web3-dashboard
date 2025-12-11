@@ -1,6 +1,6 @@
 # Testing Guide
 
-This project uses **Vitest** for unit tests and **Cypress** for E2E tests.
+This project uses **Vitest** for unit tests and **Playwright** for E2E tests.
 
 ## Unit Tests (Vitest)
 
@@ -20,8 +20,7 @@ pnpm test:run
 pnpm test:coverage
 ```
 
-
-## E2E Tests (Cypress)
+## E2E Tests (Playwright)
 
 ### Running E2E Tests
 
@@ -29,8 +28,19 @@ pnpm test:coverage
 # Run E2E tests headlessly
 pnpm test:e2e
 
-# Open Cypress Test Runner
-pnpm test:e2e:open
+# Run E2E tests with UI
+pnpm test:e2e:ui
+
+# Run E2E tests in headed mode (see browser)
+pnpm test:e2e:headed
+```
+
+### Initial Setup
+
+On first run, you need to install Playwright browsers:
+
+```bash
+npx playwright install
 ```
 
 ### Vitest Issues
@@ -39,8 +49,9 @@ pnpm test:e2e:open
 - Clear `.nuxt` directory if tests fail to find modules
 - Check that all dependencies are installed: `pnpm install`
 
-### Cypress Issues
+### Playwright Issues
 
-- Ensure the dev server is running on `http://localhost:3000` before running E2E tests
-- Check browser compatibility if tests fail
-- Use `cypress open` to debug tests interactively
+- The dev server will start automatically before running tests (configured in `playwright.config.ts`)
+- If tests fail, check the HTML report: `npx playwright show-report`
+- Use `test:e2e:headed` to debug tests visually
+- Ensure browsers are installed: `npx playwright install`
