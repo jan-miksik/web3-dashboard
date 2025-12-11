@@ -35,12 +35,7 @@ describe('logger', () => {
       expect(() => logger.debug('Debug message', context)).not.toThrow()
     })
 
-    it('should format debug messages when logging', () => {
-      // If debug logs (in dev mode), verify it's formatted correctly
-      logger.debug('Debug message')
-      // In test environment, debug may not log, so we just verify no errors
-      expect(typeof logger.debug).toBe('function')
-    })
+    // Removed redundant test - method existence is already tested above
   })
 
   describe('info', () => {
@@ -50,21 +45,10 @@ describe('logger', () => {
       expect(() => logger.info('Info message', context)).not.toThrow()
     })
 
-    it('should not log info messages in production mode', () => {
-      // Note: This test verifies the behavior, but since import.meta.dev
-      // is checked at module load time, we can't change it dynamically.
-      // In a real production build, info messages won't be logged.
-      expect(true).toBe(true) // Placeholder - behavior is tested in integration
-    })
+    // Removed placeholder test - this behavior should be tested in integration tests
   })
 
   describe('warn', () => {
-    it.skip('should not log info messages in production mode', () => {
-      // Note: This test verifies the behavior, but since import.meta.dev
-      // is checked at module load time, we can't change it dynamically.
-      // This should be tested in an integration test with a production build.
-    })
-
     it('should log warn messages in production mode', () => {
       // Warn messages should log in both dev and production
       logger.warn('Warning message')
