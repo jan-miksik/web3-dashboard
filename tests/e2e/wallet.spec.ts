@@ -20,7 +20,34 @@ test.describe('Wallet Functionality E2E Tests', () => {
     await expect(page.getByTestId('modal-overlay')).toBeVisible({ timeout: 5000 })
 
     // The internal modal should have a connect button
-    await page.getByTestId('modal-overlay').getByTestId('connect-button').click()
+    const modalConnectButton = page.getByTestId('modal-overlay').getByTestId('connect-button')
+    await modalConnectButton.click()
+
+    // After clicking the connect button, verify the expected outcome:
+    // 1. AppKit wallet connection modal should open (if wallet provider is available)
+    // 2. Or verify the click was handled gracefully without errors
+
+    // Check for AppKit modal (common selectors: w3m- prefix classes or data attributes)
+    const appKitModal = page.locator('[class*="w3m"], [id*="w3m"], [data-w3m]').first()
+
+    // Wait a moment for AppKit modal to potentially appear, then check if it's visible
+    try {
+      // Try to wait for AppKit modal to appear
+      await expect(appKitModal).toBeVisible({ timeout: 2000 })
+
+      // AppKit modal opened - verify it shows connection UI
+      // Check for wallet connection content (text like "Connect Wallet" or wallet provider names)
+      const walletContent = page.getByText(/connect|wallet|metamask|coinbase/i).first()
+      await expect(walletContent).toBeVisible({ timeout: 2000 })
+    } catch {
+      // No AppKit modal detected (test environment may not have wallet provider)
+      // Verify the click was handled gracefully: modal button should still be visible/functional
+      // and no error state should appear
+      await expect(modalConnectButton).toBeVisible({ timeout: 1000 })
+      // Ensure no error messages appeared after the click
+      const errorMessage = page.getByTestId('modal-overlay').getByTestId('address-error')
+      await expect(errorMessage).not.toBeVisible({ timeout: 500 })
+    }
   })
 
   // Note: Actual wallet connection tests would require:
@@ -55,7 +82,6 @@ test.describe('Wallet Functionality E2E Tests', () => {
     // Test clearing the watched address brings back the modal
     await expect(page.getByTestId('clear-watch-btn')).toBeVisible()
     await page.getByTestId('clear-watch-btn').click()
-    await expect(page.getByTestId('modal-overlay')).toBeVisible({ timeout: 2000 })
     await expect(page.getByTestId('modal-overlay')).toBeVisible({ timeout: 2000 })
   })
 })

@@ -46,7 +46,7 @@ describe('chains-config', () => {
       expect(config.chains).toHaveLength(10)
     })
 
-    it('should have transports configured for all chains', () => {
+    it('should have valid chain IDs', () => {
       // Wagmi config may structure transports differently
       // The important thing is that all chains are configured
       config.chains.forEach(chain => {
@@ -119,12 +119,6 @@ describe('chains-config', () => {
       const chainIds = config.chains.map(chain => chain.id)
       const uniqueChainIds = new Set(chainIds)
       expect(uniqueChainIds.size).toBe(chainIds.length)
-    })
-
-    it('should have transport configuration', () => {
-      // Wagmi config handles transports internally
-      // We verify the config is properly structured by checking chains
-      expect(config.chains.length).toBeGreaterThan(0)
     })
   })
 })

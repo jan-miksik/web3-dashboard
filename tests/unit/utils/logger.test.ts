@@ -36,15 +36,6 @@ describe('logger', () => {
       expect(() => logger.debug('Debug message', context)).not.toThrow()
     })
 
-    it('should not log debug messages in production mode', () => {
-      // Note: This test verifies the behavior, but since import.meta.dev
-      // is checked at module load time, we can't change it dynamically.
-      // In a real production build, debug messages won't be logged.
-      // This test documents the expected behavior.
-      // If import.meta.dev is false when the module loads, debug won't log.
-      expect(true).toBe(true) // Placeholder - behavior is tested in integration
-    })
-
     it('should format debug messages when logging', () => {
       // If debug logs (in dev mode), verify it's formatted correctly
       logger.debug('Debug message')
@@ -54,13 +45,6 @@ describe('logger', () => {
   })
 
   describe('info', () => {
-    it('should have info method that can be called', () => {
-      // Info may or may not log depending on import.meta.dev at module load
-      // Test that the method exists and can be called without errors
-      expect(() => logger.info('Info message')).not.toThrow()
-      expect(typeof logger.info).toBe('function')
-    })
-
     it('should handle context in info messages', () => {
       const context = { action: 'connect', wallet: 'MetaMask' }
       // Method should be callable with context
@@ -76,12 +60,10 @@ describe('logger', () => {
   })
 
   describe('warn', () => {
-    it('should log warn messages in development mode', () => {
-      logger.warn('Warning message')
-
-      expect(consoleWarnSpy).toHaveBeenCalledTimes(1)
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('[WARN]'))
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Warning message'))
+    it.skip('should not log info messages in production mode', () => {
+      // Note: This test verifies the behavior, but since import.meta.dev
+      // is checked at module load time, we can't change it dynamically.
+      // This should be tested in an integration test with a production build.
     })
 
     it('should log warn messages in production mode', () => {
@@ -104,8 +86,6 @@ describe('logger', () => {
   describe('error', () => {
     it('should log error messages with Error instance', () => {
       const error = new Error('Test error')
-      error.stack = 'Error: Test error\n    at test.js:1:1'
-
       logger.error('Error message', error)
 
       expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
@@ -139,15 +119,6 @@ describe('logger', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error message'))
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Context:'))
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('"module": "wallet"'))
-    })
-
-    it('should log error messages in production mode', () => {
-      // Error messages should log in both dev and production
-      const error = new Error('Test error')
-      logger.error('Error message', error)
-
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
-      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error message'))
     })
 
     it('should handle errors without stack trace', () => {

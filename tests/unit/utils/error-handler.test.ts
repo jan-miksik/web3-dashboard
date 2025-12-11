@@ -353,15 +353,25 @@ describe('error-handler', () => {
     })
 
     it('should not show notification on server side', () => {
-      // Note: import.meta.client is checked at runtime in the error handler
-      // In a real server environment, import.meta.client would be false
-      // This test verifies the behavior when client is false
-      // Since we can't easily mock import.meta.client at runtime in tests,
-      // we test that the notification logic exists and is conditional
       const error = new Error('Test error')
-      // The error handler checks import.meta.client before showing notifications
-      // In SSR, notifications won't be shown
-      expect(() => handleError(error)).not.toThrow()
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      // Simulate server-side execution by setting isClient to false
+      handleError(error, { isClient: false })
+
+      // Notification should not be shown when isClient is false
+      expect(consoleWarnSpy).not.toHaveBeenCalled()
+
+      // Error should still be logged even on server side
+      expect(logger.error).toHaveBeenCalledWith(
+        'An error occurred',
+        error,
+        expect.objectContaining({
+          userMessage: expect.any(String),
+        })
+      )
+
+      consoleWarnSpy.mockRestore()
     })
 
     it('should handle errors in production mode', () => {

@@ -1,6 +1,6 @@
 /**
  * Centralized error handling utility
- * 
+ *
  * Provides consistent error handling across the application with:
  * - User-friendly error messages
  * - Automatic error notifications
@@ -31,6 +31,11 @@ export interface ErrorHandlerOptions {
    * Custom error code for tracking
    */
   errorCode?: string
+  /**
+   * Whether code is running on client side (default: import.meta.client)
+   * Can be set to false to test SSR behavior
+   */
+  isClient?: boolean
 }
 
 /**
@@ -38,23 +43,23 @@ export interface ErrorHandlerOptions {
  */
 const ERROR_MESSAGES: Record<string, string> = {
   // Network errors
-  'NetworkError': 'Network connection failed. Please check your internet connection.',
-  'FetchError': 'Failed to fetch data. Please try again.',
-  'TimeoutError': 'Request timed out. Please try again.',
-  
+  NetworkError: 'Network connection failed. Please check your internet connection.',
+  FetchError: 'Failed to fetch data. Please try again.',
+  TimeoutError: 'Request timed out. Please try again.',
+
   // API errors
-  'APIError': 'An error occurred while processing your request.',
-  'UnauthorizedError': 'You are not authorized to perform this action.',
-  'NotFoundError': 'The requested resource was not found.',
-  'ValidationError': 'Invalid input. Please check your data and try again.',
-  
+  APIError: 'An error occurred while processing your request.',
+  UnauthorizedError: 'You are not authorized to perform this action.',
+  NotFoundError: 'The requested resource was not found.',
+  ValidationError: 'Invalid input. Please check your data and try again.',
+
   // Wallet errors
-  'WalletConnectionError': 'Failed to connect wallet. Please try again.',
-  'TransactionError': 'Transaction failed. Please try again.',
-  'InsufficientFundsError': 'Insufficient funds to complete this transaction.',
-  
+  WalletConnectionError: 'Failed to connect wallet. Please try again.',
+  TransactionError: 'Transaction failed. Please try again.',
+  InsufficientFundsError: 'Insufficient funds to complete this transaction.',
+
   // Generic
-  'UnknownError': 'An unexpected error occurred. Please try again later.',
+  UnknownError: 'An unexpected error occurred. Please try again later.',
 }
 
 /**
@@ -101,20 +106,24 @@ function getUserFriendlyMessage(error: unknown, customMessage?: string): string 
  * Shows a notification to the user
  * This is a placeholder - you should integrate with your notification system
  */
-function showNotification(message: string, type: 'error' | 'warning' | 'info' = 'error'): void {
+function showNotification(
+  message: string,
+  type: 'error' | 'warning' | 'info' = 'error',
+  isClient: boolean = import.meta.client
+): void {
   // TODO: Integrate with your notification/toast system
   // Examples:
   // - Nuxt UI: useToast()
   // - Vue Toastification
   // - Custom notification composable
-  
+
   // For now, we'll use a simple approach that can be enhanced later
-  if (import.meta.client) {
+  if (isClient) {
     // Client-side only
     // You can replace this with your actual notification system
     // eslint-disable-next-line no-console
     console.warn(`[Notification ${type}]: ${message}`)
-    
+
     // Example integration (uncomment and adapt to your notification system):
     // const toast = useToast()
     // toast.add({
@@ -127,10 +136,10 @@ function showNotification(message: string, type: 'error' | 'warning' | 'info' = 
 
 /**
  * Centralized error handler
- * 
+ *
  * @param error - The error to handle
  * @param options - Error handling options
- * 
+ *
  * @example
  * ```typescript
  * try {
@@ -144,36 +153,30 @@ function showNotification(message: string, type: 'error' | 'warning' | 'info' = 
  * }
  * ```
  */
-export function handleError(
-  error: unknown,
-  options: ErrorHandlerOptions = {}
-): void {
+export function handleError(error: unknown, options: ErrorHandlerOptions = {}): void {
   const {
     message: customMessage,
     context = {},
     showNotification: shouldShowNotification = true,
     logError: shouldLogError = true,
     errorCode,
+    isClient = import.meta.client,
   } = options
 
   const userMessage = getUserFriendlyMessage(error, customMessage)
 
   // Log the error
   if (shouldLogError) {
-    logger.error(
-      customMessage || 'An error occurred',
-      error,
-      {
-        ...context,
-        errorCode,
-        userMessage,
-      }
-    )
+    logger.error(customMessage || 'An error occurred', error, {
+      ...context,
+      errorCode,
+      userMessage,
+    })
   }
 
   // Show notification to user
-  if (shouldShowNotification && import.meta.client) {
-    showNotification(userMessage, 'error')
+  if (shouldShowNotification && isClient) {
+    showNotification(userMessage, 'error', isClient)
   }
 
   // In production, you might want to send errors to an error tracking service
@@ -187,14 +190,14 @@ export function handleError(
 /**
  * Creates an error handler with default options
  * Useful for creating domain-specific error handlers
- * 
+ *
  * @example
  * ```typescript
  * const walletErrorHandler = createErrorHandler({
  *   context: { module: 'wallet' },
  *   errorCode: 'WALLET_ERROR',
  * })
- * 
+ *
  * try {
  *   await connectWallet()
  * } catch (error) {
@@ -214,4 +217,3 @@ export function createErrorHandler(defaultOptions: ErrorHandlerOptions) {
     })
   }
 }
-
