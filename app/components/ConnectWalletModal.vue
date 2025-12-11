@@ -69,7 +69,7 @@ function handleClearWatch() {
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="showModal" class="modal-overlay">
+      <div v-if="showModal" class="modal-overlay" data-testid="modal-overlay">
         <div class="modal-content">
 
           <div class="modal-body">
@@ -89,12 +89,12 @@ function handleClearWatch() {
             <div class="watch-section">
               <label class="input-label">Watch Address</label>
               
-              <div v-if="watchedAddress" class="watched-address-display">
+              <div v-if="watchedAddress" class="watched-address-display" data-testid="watched-address-display">
                 <div class="watched-info">
                   <span class="watched-label">Watching:</span>
                   <span class="watched-address font-mono">{{ watchedAddress }}</span>
                 </div>
-                <button class="clear-btn" @click="handleClearWatch">
+                <button class="clear-btn" data-testid="clear-watch-btn" @click="handleClearWatch">
                   Clear
                 </button>
               </div>
@@ -105,12 +105,13 @@ function handleClearWatch() {
                   type="text"
                   placeholder="0x..."
                   class="address-input"
+                  data-testid="address-input"
                   :class="{ error: addressError }"
                   @input="(e: Event) => handleAddressInput((e.target as HTMLInputElement).value)"
                   @blur="handleAddressInput(addressInput)"
                   @keyup.enter="() => handleWatchAddress()"
                 />
-                <p v-if="addressError" class="error-message">{{ addressError }}</p>
+                <p v-if="addressError" class="error-message" data-testid="address-error">{{ addressError }}</p>
               </div>
             </div>
           </div>

@@ -12,7 +12,19 @@ function getAuthHeader(apiKey: string): string {
   return `Basic ${credentials}`
 }
 
+// Allow dependency injection for testing
+function getRuntimeConfig() {
+  return useRuntimeConfig()
+}
+
 export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
+  return handlePositionsRequest(event, getRuntimeConfig)
+})
+
+export async function handlePositionsRequest(
+  event: any,
+  getConfig: () => ReturnType<typeof useRuntimeConfig> = getRuntimeConfig
+): Promise<ZerionApiResponse> {
   const query = getQuery(event)
   const walletAddress = query.address as string
 
@@ -23,7 +35,7 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
     })
   }
 
-  const config = useRuntimeConfig()
+  const config = getConfig()
   const apiKey = config.zerionApiKey as string
 
   if (!apiKey) {
@@ -154,6 +166,9 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
         
         // Safety check to prevent infinite loops
         if (pageCount >= maxPages) {
+          // Note: Server-side logging - using logger would require importing client-side utils
+          // For server routes, we can use console.warn as it's server-side only
+          // eslint-disable-next-line no-console
           console.warn(`Reached maximum page limit (${maxPages}) for wallet ${walletAddress}`)
           break
         }
@@ -182,5 +197,5 @@ export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
       statusMessage: `Failed to fetch token balances: ${errorMessage}`,
     })
   }
-})
+}
 

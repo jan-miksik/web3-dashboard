@@ -2,9 +2,9 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTokens } from '~/composables/useTokens'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
-
 import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
+import { handleError } from '~/utils/error-handler'
 
 // Get available chains from tokens
 const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
@@ -44,7 +44,11 @@ async function copyTokenAddress(address: string) {
       copiedAddress.value = null
     }, 2000)
   } catch (error) {
-    console.error('Failed to copy address:', error)
+    handleError(error, {
+      message: 'Failed to copy address to clipboard',
+      context: { address },
+      showNotification: true,
+    })
   }
 }
 
@@ -210,7 +214,7 @@ function formatTotalValue(value: number): string {
 </script>
 
 <template>
-  <div class="card token-list">
+  <div class="card token-list" data-testid="token-list">
     <div class="card-header">
       <div class="header-title-section">
         <h3 class="card-title">Net Worth</h3>
@@ -223,6 +227,7 @@ function formatTotalValue(value: number): string {
         <div v-if="hasAddress && availableChains.length > 0" class="network-filter-container" ref="chainFilterRef">
           <button 
             class="network-filter-btn"
+            data-testid="network-filter-btn"
             :class="{ active: selectedChainIds.size > 0 }"
             @click="showChainFilter = !showChainFilter"
           >
@@ -230,7 +235,7 @@ function formatTotalValue(value: number): string {
             <span class="filter-arrow" :class="{ rotated: showChainFilter }">▼</span>
           </button>
           <Transition name="dropdown">
-            <div v-if="showChainFilter" class="network-filter-dropdown">
+            <div v-if="showChainFilter" class="network-filter-dropdown" data-testid="network-filter-dropdown">
               <button
                 class="filter-option"
                 :class="{ selected: selectedChainIds.size === 0 }"
@@ -243,6 +248,7 @@ function formatTotalValue(value: number): string {
                 v-for="chain in availableChains"
                 :key="chain.id"
                 class="filter-option"
+                data-testid="network-filter-option"
                 :class="{ selected: isChainSelected(chain.id) }"
                 @click="toggleChain(chain.id)"
               >
@@ -269,6 +275,7 @@ function formatTotalValue(value: number): string {
         <button 
           v-if="hasAddress" 
           class="refresh-btn" 
+          data-testid="refresh-btn"
           :disabled="isLoading || isRefreshing"
           title="Refresh balances"
           @click="handleRefresh"
@@ -294,7 +301,7 @@ function formatTotalValue(value: number): string {
     </div>
 
     <!-- Loading State -->
-    <div v-else-if="isLoading && tokens.length === 0" class="loading-state">
+    <div v-else-if="isLoading && tokens.length === 0" class="loading-state" data-testid="loading-state">
       <div class="skeleton-table">
         <div v-for="i in 5" :key="i" class="skeleton-row">
           <div class="skeleton skeleton-token"></div>
@@ -304,7 +311,7 @@ function formatTotalValue(value: number): string {
     </div>
 
     <!-- Empty Tokens State -->
-    <div v-else-if="filteredTokens.length === 0" class="empty-state">
+    <div v-else-if="filteredTokens.length === 0" class="empty-state" data-testid="empty-state">
       <div class="empty-icon">📭</div>
       <p v-if="!showLowValueAssets && tokens.length > 0">
         No tokens with value ≥ $5.
@@ -314,11 +321,11 @@ function formatTotalValue(value: number): string {
     </div>
 
     <!-- Token Table -->
-    <div v-else class="table-container" :class="{ refreshing: isRefreshing }">
-      <table class="token-table" :class="{ loading: isLoading || isRefreshing }">
+    <div v-else class="table-container" :class="{ refreshing: isRefreshing }" data-testid="token-table-container">
+      <table class="token-table" :class="{ loading: isLoading || isRefreshing }" data-testid="token-table">
         <tbody>
           <!-- High-value tokens (>= $5) -->
-          <tr v-for="token in highValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row">
+          <tr v-for="token in highValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row" data-testid="token-row">
             <td class="td-token">
               <div class="token-info">
                 <div class="token-logo">
@@ -336,6 +343,7 @@ function formatTotalValue(value: number): string {
                     <button 
                       v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
                       class="token-address-btn"
+                      data-testid="copy-token-address-btn"
                       :class="{ copied: copiedAddress === token.address }"
                       :title="copiedAddress === token.address ? 'Copied!' : 'Copy contract address'"
                       @click="copyTokenAddress(token.address)"
@@ -379,7 +387,7 @@ function formatTotalValue(value: number): string {
           <!-- Divider row with button (only if there are low-value assets) -->
           <tr v-if="hasLowValueAssets && !showLowValueAssets" class="divider-row">
             <td colspan="2" class="divider-cell">
-              <button class="show-low-value-btn" @click="showLowValueAssets = true">
+              <button class="show-low-value-btn" data-testid="show-low-value-btn" @click="showLowValueAssets = true">
                 Show assets < $5
               </button>
             </td>
@@ -389,12 +397,12 @@ function formatTotalValue(value: number): string {
           <template v-if="showLowValueAssets">
             <tr class="divider-row">
               <td colspan="2" class="divider-cell">
-                <button class="hide-low-value-btn" @click="showLowValueAssets = false">
+                <button class="hide-low-value-btn" data-testid="hide-low-value-btn" @click="showLowValueAssets = false">
                   Hide assets < $5
                 </button>
               </td>
             </tr>
-            <tr v-for="token in lowValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row">
+            <tr v-for="token in lowValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row" data-testid="token-row">
               <td class="td-token">
                 <div class="token-info">
                   <div class="token-logo">

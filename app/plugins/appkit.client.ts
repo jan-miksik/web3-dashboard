@@ -25,7 +25,7 @@ export default defineNuxtPlugin(() => {
   const metadata = {
     name: 'web3 dashboard',
     description: 'web3 dashboard',
-    url: 'https://web3-dashboard.com',
+    url: 'http://localhost:3000',
     icons: ['/favicon.ico']
   }
 

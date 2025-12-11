@@ -1,0 +1,191 @@
+---
+description: General project rules and coding standards
+alwaysApply: true
+---
+
+# General Project Rules
+
+## Logging
+
+**NEVER use `console.log`, `console.error`, `console.warn`, or any other `console.*` methods directly.**
+
+- Always use the centralized `logger` utility from `~/utils/logger`
+- The logger provides consistent formatting, log levels, and can be configured per environment
+- Example:
+  ```typescript
+  import { logger } from '~/utils/logger'
+  
+  // ✅ Correct
+  logger.info('User logged in', { userId: user.id })
+  logger.error('Failed to fetch data', { error, context })
+  logger.warn('Deprecated API used', { endpoint })
+  logger.debug('Processing request', { requestId })
+  
+  // ❌ Wrong
+  console.log('User logged in')
+  console.error('Failed to fetch data')
+  ```
+
+## Error Handling
+
+**NEVER throw raw errors or use `throw new Error()` directly.**
+
+- Always use the centralized `handleError` function from `~/utils/error-handler`
+- The error handler provides:
+  - Consistent error formatting
+  - User-friendly error messages
+  - Automatic error notifications (toast/notification system)
+  - Error logging
+  - Error tracking integration (if configured)
+- Example:
+  ```typescript
+  import { handleError } from '~/utils/error-handler'
+  
+  // ✅ Correct
+  try {
+    await fetchData()
+  } catch (error) {
+    handleError(error, {
+      message: 'Failed to load wallet data',
+      context: { walletAddress },
+      showNotification: true,
+    })
+  }
+  
+  // ❌ Wrong
+  try {
+    await fetchData()
+  } catch (error) {
+    throw error
+    // or
+    throw new Error('Something went wrong')
+  }
+  ```
+
+## TypeScript Types
+
+**NEVER use `any` type in TypeScript code.**
+
+- Always use proper types, interfaces, or `unknown` when the type is truly unknown
+- Use type guards and type assertions when necessary
+- Prefer `unknown` over `any` when dealing with external data
+- Example:
+  ```typescript
+  // ✅ Correct
+  interface UserData {
+    id: string
+    name: string
+  }
+  
+  function processUser(data: unknown): UserData {
+    if (isUserData(data)) {
+      return data
+    }
+    throw new Error('Invalid user data')
+  }
+  
+  // ❌ Wrong
+  function processUser(data: any): any {
+    return data
+  }
+  ```
+
+## DRY Principle (Don't Repeat Yourself)
+
+- Extract common logic into reusable functions, composables, or utilities
+- Create shared components for repeated UI patterns
+- Use constants for magic numbers and strings
+- Avoid duplicating code - if you find yourself copying code, refactor it
+- Example:
+  ```typescript
+  // ✅ Correct - reusable utility
+  // utils/format.ts
+  export function formatAddress(address: string): string {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+  
+  // ❌ Wrong - duplicated logic
+  const shortAddress1 = `${address1.slice(0, 6)}...${address1.slice(-4)}`
+  const shortAddress2 = `${address2.slice(0, 6)}...${address2.slice(-4)}`
+  ```
+
+## Frontend DApp Development Rules
+
+### Language & Type Safety
+
+- **All JavaScript/Frontend code must be in TypeScript**
+- Enforce strict mode for type safety
+- Never use `any` type (see TypeScript Types section above)
+
+### Chain Interaction
+
+**NEVER use `ethers.js`. Always use Viem for all low-level contract interaction and data formatting.**
+
+- Use Viem for:
+  - Contract interactions
+  - Data formatting (addresses, numbers, etc.)
+  - Transaction building
+  - Event parsing
+- Example:
+  ```typescript
+  // ✅ Correct - using Viem
+  import { formatEther, parseEther } from 'viem'
+  const balance = formatEther(bigIntValue)
+  
+  // ❌ Wrong - using ethers.js
+  import { ethers } from 'ethers'
+  const balance = ethers.formatEther(bigIntValue)
+  ```
+
+### Testing Stack
+
+- **Unit/Integration Tests:**
+  - Use **Vitest** with framework-specific testing libraries
+  - For Vue: Use **Vue Test Utils** (already configured)
+  - Write tests for all composables, utilities, and components
+  - Aim for high test coverage
+
+- **E2E Tests:**
+  - Use **Playwright** with Web3 helpers like **Synpress**
+  - Tests must run against a local **Anvil** fork
+  - Test real wallet interactions and transactions
+
+### Framework-Specific Rules (Nuxt/Vue)
+
+- **Vue 3 Composition API:**
+  - Always use `<script setup>` syntax
+  - Use Composition API (`ref`, `computed`, `watch`, etc.)
+  - Avoid Options API unless necessary
+
+- **Nuxt 3 Features:**
+  - Leverage Nuxt's built-in features:
+    - Auto-imports (no need to import `ref`, `computed`, etc.)
+    - `useFetch` and `useAsyncData` for data fetching
+    - `useRuntimeConfig` for environment variables
+    - `useRoute` and `useRouter` for routing
+  - Use **Nuxt UI** or similar component libraries for consistent UI
+
+- **State Management:**
+  - Use **Wagmi** for Web3 state management
+  - Use **TanStack Query** (via Wagmi) for async chain data
+  - Use composables for shared business logic
+  - Example:
+    ```typescript
+    // ✅ Correct - using Wagmi with TanStack Query
+    import { useConnection } from '@wagmi/vue'
+    const { address, isConnected } = useConnection({ config })
+    
+    // ✅ Correct - using Nuxt composables
+    const { data, error } = useFetch('/api/zerion/positions')
+    ```
+
+## Additional Best Practices
+
+- Use meaningful variable and function names
+- Keep functions small and focused on a single responsibility
+- Add JSDoc comments for public APIs and complex functions
+- Follow the existing code style and formatting
+- Write tests for new features and bug fixes
+- Use async/await instead of promises chains when possible
+- Prefer composition over inheritance
+- Keep components and composables focused and reusable

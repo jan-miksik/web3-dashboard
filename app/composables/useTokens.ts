@@ -4,6 +4,8 @@ import { useConnection, useChainId } from '@wagmi/vue'
 import { config } from '~/chains-config'
 import { useWatchedAddress } from './useWatchedAddress'
 import { ZERION_TO_CHAIN_ID, getChainName } from '~/utils/chains'
+import { logger } from '~/utils/logger'
+import { handleError } from '~/utils/error-handler'
 import type {
   ZerionApiResponse,
   ZerionPosition,
@@ -57,10 +59,10 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   const data = response
 
   // Debug: Log the response structure (only in development)
-  if (import.meta.dev) {
-    console.log('Zerion API Response:', JSON.stringify(data, null, 2))
-    console.log('Zerion API Response keys:', Object.keys(data))
-  }
+  logger.debug('Zerion API Response', {
+    data: JSON.stringify(data, null, 2),
+    keys: Object.keys(data),
+  })
 
   // Handle Zerion API response structure
   // Response format: { data: [...], included: [...] }
@@ -73,19 +75,14 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   }
   
   if (!Array.isArray(positions) || positions.length === 0) {
-    if (import.meta.dev) {
-      console.log('Zerion API: No positions found in response')
-      console.log('Full response for debugging:', data)
-    }
+    logger.debug('Zerion API: No positions found in response', { data })
     return []
   }
 
-  if (import.meta.dev) {
-    console.log(`Zerion API: Found ${positions.length} positions to process`)
-    if (positions.length > 0) {
-      console.log('Sample position structure:', positions[0])
-    }
-  }
+  logger.debug('Zerion API: Found positions to process', {
+    count: positions.length,
+    samplePosition: positions.length > 0 ? positions[0] : undefined,
+  })
 
   // Cache included array for lookups
   const included: ZerionIncludedItem[] = Array.isArray(data.included) ? data.included : []
@@ -102,13 +99,13 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
         // Get chain ID from relationships (JSON:API format: relationships.chain.data.id)
         const chainId = position.relationships?.chain?.data?.id
         if (!chainId) {
-          console.warn('Zerion API: Position missing chain ID:', position)
+          logger.warn('Zerion API: Position missing chain ID', { position })
           return null
         }
         
         const numericChainId = ZERION_TO_CHAIN_ID[chainId]
         if (!numericChainId) {
-          console.warn(`Zerion API: Unknown chain ID: ${chainId}`)
+          logger.warn('Zerion API: Unknown chain ID', { chainId })
           return null
         }
         
@@ -251,15 +248,16 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
           tokenType: isNative ? 'native' : 'erc20',
         } as Token
       } catch (error) {
-        console.error('Error transforming Zerion position:', error, position)
+        logger.error('Error transforming Zerion position', error, { position })
         return null
       }
     })
     .filter((token): token is Token => token !== null)
 
-  if (import.meta.dev) {
-    console.log(`Zerion API: Transformed ${fetchedTokens.length} tokens from ${positions.length} positions`)
-  }
+  logger.debug('Zerion API: Transformed tokens', {
+    tokenCount: fetchedTokens.length,
+    positionCount: positions.length,
+  })
 
   return fetchedTokens
 }
@@ -285,9 +283,15 @@ export function useTokens() {
     refetch,
   } = useQuery({
     queryKey: ['tokenBalances', effectiveAddress],
-    queryFn: () => {
+    queryFn: async () => {
       if (!effectiveAddress.value) {
-        throw new Error('Wallet address is required')
+        const error = new Error('Wallet address is required')
+        handleError(error, {
+          message: 'Wallet address is required to fetch token balances',
+          context: { effectiveAddress: effectiveAddress.value },
+          showNotification: false, // Don't show notification for query errors
+        })
+        throw error
       }
       return fetchTokenBalances(effectiveAddress.value)
     },

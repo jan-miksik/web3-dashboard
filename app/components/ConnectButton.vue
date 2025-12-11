@@ -14,14 +14,15 @@ const buttonText = computed(() => {
 </script>
 
 <template>
-  <div class="connect-button-wrapper">
+  <div class="connect-button-wrapper" data-testid="connect-button-wrapper">
     <!-- Custom styled button -->
     <button 
       class="connect-button" 
       :class="{ connected: isConnected }"
+      data-testid="connect-button"
       @click="useAppKit().open()"
     >
-      <span>{{ buttonText }}</span>
+      <span data-testid="connect-button-text">{{ buttonText }}</span>
     </button>
   </div>
 </template>

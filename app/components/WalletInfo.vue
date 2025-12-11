@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { config } from '~/chains-config'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
+import { handleError } from '~/utils/error-handler'
 
 const { address, isConnected } = useConnection({ config })
 const { watchedAddress, clearWatchedAddress } = useWatchedAddress()
@@ -46,7 +47,11 @@ async function copyAddress() {
         isCopied.value = false
       }, 2000)
     } catch (error) {
-      console.error('Failed to copy address:', error)
+      handleError(error, {
+        message: 'Failed to copy address to clipboard',
+        context: { address: effectiveAddress.value },
+        showNotification: true,
+      })
     }
   }
 }
@@ -58,19 +63,21 @@ async function copyAddress() {
       <h3 class="card-title">Wallet</h3>
       <span 
         class="status-badge" 
+        data-testid="status-badge"
         :class="isConnected ? 'connected' : isWatchMode ? 'watch-mode' : 'disconnected'"
       >
         {{ isConnected ? 'Connected' : isWatchMode ? 'Watch Mode' : 'Disconnected' }}
       </span>
     </div>
 
-    <div v-if="isConnected || isWatchMode" class="wallet-details">
+    <div v-if="isConnected || isWatchMode" class="wallet-details" data-testid="wallet-details">
       <div class="detail-row">
         <div class="address-container">
-          <span class="detail-value font-mono address-full">{{ effectiveAddress }}</span>
-          <span class="detail-value font-mono address-short">{{ shortAddress }}</span>
+          <span class="detail-value font-mono address-full" data-testid="address-full">{{ effectiveAddress }}</span>
+          <span class="detail-value font-mono address-short" data-testid="address-short">{{ shortAddress }}</span>
           <button 
             class="copy-btn" 
+            data-testid="copy-address-btn"
             :class="{ copied: isCopied }"
             :title="isCopied ? 'Copied!' : 'Copy address'" 
             @click="copyAddress"
@@ -88,8 +95,8 @@ async function copyAddress() {
         </div>
       </div>
 
-      <div v-if="isWatchMode" class="watch-mode-actions">
-        <button class="clear-watch-btn" @click="clearWatchedAddress">
+      <div v-if="isWatchMode" class="watch-mode-actions" data-testid="watch-mode-actions">
+        <button class="clear-watch-btn" data-testid="clear-watch-btn" @click="clearWatchedAddress">
           Stop Watching
         </button>
       </div>
