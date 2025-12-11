@@ -1,4 +1,24 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, Page } from '@playwright/test'
+
+/**
+ * Helper function to fill address in modal and wait for it to close.
+ * The @input handler will auto-validate and close modal if valid.
+ * @param page - Playwright page object
+ * @param address - Address to fill (defaults to common test address)
+ */
+async function fillAddressAndWaitForModalClose(
+  page: Page,
+  address: string = '0x1234567890123456789012345678901234567890'
+) {
+  const modal = page.getByTestId('modal-overlay')
+  const addressInput = modal.getByTestId('address-input')
+
+  // Fill the address - the @input handler will auto-validate and close modal if valid
+  await addressInput.fill(address)
+  // Don't blur - the input handler already processes it, and modal may close immediately
+  // Just wait for modal to close (it closes automatically when valid address is set)
+  await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+}
 
 test.describe('Token Display E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -7,24 +27,15 @@ test.describe('Token Display E2E Tests', () => {
 
   test('should show token list when wallet is connected', async ({ page }) => {
     // Watch an address to simulate having an address (without needing actual wallet connection)
-    // Use a known valid test address (42 chars: 0x + 40 hex)
-    const testAddress = '0x1234567890123456789012345678901234567890'
-
-    // Enter address in the modal
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
-
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    await fillAddressAndWaitForModalClose(page)
 
     // Check that token list component is visible
     await expect(page.getByTestId('token-list')).toBeVisible()
 
-    // Wait for tokens to load (either tokens appear or empty/loading state)
-    await page.waitForTimeout(2000)
+    // Wait for tokens to load by waiting for the API response
+    await page.waitForResponse(
+      response => response.url().includes('/api/zerion/positions') && response.status() === 200
+    )
 
     // Token list should be visible regardless of whether tokens exist
     await expect(page.getByTestId('token-list')).toBeVisible()
@@ -32,15 +43,7 @@ test.describe('Token Display E2E Tests', () => {
 
   test('should display token information correctly', async ({ page }) => {
     // Watch an address
-    const testAddress = '0x1234567890123456789012345678901234567890'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
-
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    await fillAddressAndWaitForModalClose(page)
 
     // Wait for token list to load
     await page.waitForTimeout(2000)
@@ -54,24 +57,16 @@ test.describe('Token Display E2E Tests', () => {
       const firstRow = tokenRows.first()
       await expect(firstRow).toBeVisible()
 
-      // Token should have symbol visible (in token-symbol class)
-      // USD value should be visible
-      // Chain badge should be visible
-      // These are checked implicitly by the row being visible and structured
+      // Verify token information is displayed
+      await expect(firstRow.locator('.token-symbol')).toBeVisible()
+      await expect(firstRow.locator('.token-value')).toBeVisible()
+      await expect(firstRow.locator('.chain-badge')).toBeVisible()
     }
   })
 
   test('should handle empty token list', async ({ page }) => {
     // Watch an address that might have no tokens
-    const testAddress = '0x0000000000000000000000000000000000000001'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
-
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    await fillAddressAndWaitForModalClose(page, '0x0000000000000000000000000000000000000001')
 
     // Wait for loading to complete
     await page.waitForTimeout(3000)
@@ -79,30 +74,23 @@ test.describe('Token Display E2E Tests', () => {
     // Token list component should be visible
     await expect(page.getByTestId('token-list')).toBeVisible()
 
-    // Check for one of the possible states: empty state, token table, loading, or error
     const emptyState = page.getByTestId('empty-state')
-    const tokenTable = page.getByTestId('token-table-container')
     const loadingState = page.getByTestId('loading-state')
 
     const emptyVisible = await emptyState.isVisible().catch(() => false)
-    const tableVisible = await tokenTable.isVisible().catch(() => false)
     const loadingVisible = await loadingState.isVisible().catch(() => false)
 
-    // At least one state should be visible (empty, table, or still loading)
-    expect(emptyVisible || tableVisible || loadingVisible).toBeTruthy()
+    // Should show empty state or still be loading (not token table)
+    expect(emptyVisible || loadingVisible).toBeTruthy()
+
+    // Verify no tokens are displayed
+    const tokenRows = await page.getByTestId('token-row').count()
+    expect(tokenRows).toBe(0)
   })
 
   test('should filter tokens by chain', async ({ page }) => {
     // Watch an address
-    const testAddress = '0x1234567890123456789012345678901234567890'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
-
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    await fillAddressAndWaitForModalClose(page)
 
     // Wait for tokens to load
     await page.waitForTimeout(3000)
@@ -137,15 +125,7 @@ test.describe('Token Display E2E Tests', () => {
 
   test('should sort tokens by value', async ({ page }) => {
     // Watch an address
-    const testAddress = '0x1234567890123456789012345678901234567890'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
-
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    await fillAddressAndWaitForModalClose(page)
 
     // Wait for tokens to load
     await page.waitForTimeout(3000)
@@ -159,63 +139,89 @@ test.describe('Token Display E2E Tests', () => {
       const tokenRows = page.getByTestId('token-row')
       const count = await tokenRows.count()
 
-      if (count > 1) {
-        // Tokens should be sorted by value (highest first)
-        // We can verify this by checking USD values are in descending order
-        // This is implicit in the component logic, but we verify the table structure
-        await expect(tokenRows.first()).toBeVisible()
+      // Ensure we have more than one token to verify sorting
+      expect(count).toBeGreaterThan(1)
+
+      // Extract USD values from each token row
+      const usdValues: number[] = []
+
+      for (let i = 0; i < count; i++) {
+        const row = tokenRows.nth(i)
+        const usdValueElement = row.locator('.usd-value')
+        await expect(usdValueElement).toBeVisible()
+
+        const usdValueText = await usdValueElement.textContent()
+        expect(usdValueText).toBeTruthy()
+
+        // Parse USD value text to numeric value
+        // Handle formats like: "$1,234.56", "<$0.01", "$0.00"
+        let numericValue = 0
+        if (usdValueText) {
+          // Handle "<$0.01" case - treat as 0.005 (midpoint between 0 and 0.01)
+          if (usdValueText.trim().startsWith('<')) {
+            numericValue = 0.005
+          } else {
+            // Remove currency symbols, commas, and whitespace
+            const cleaned = usdValueText.replace(/[$,\s]/g, '')
+            numericValue = parseFloat(cleaned) || 0
+          }
+        }
+
+        usdValues.push(numericValue)
+      }
+
+      // Assert that values are in non-increasing order (descending)
+      // Each value should be >= the next value
+      for (let i = 0; i < usdValues.length - 1; i++) {
+        const currentValue = usdValues[i]
+        const nextValue = usdValues[i + 1]
+        // Test will fail here if sorting is incorrect
+        if (currentValue < nextValue) {
+          throw new Error(
+            `Tokens are not sorted correctly: token at index ${i} has value $${currentValue.toFixed(2)} which is less than token at index ${i + 1} with value $${nextValue.toFixed(2)}`
+          )
+        }
+        expect(currentValue).toBeGreaterThanOrEqual(nextValue)
       }
     }
   })
-
   test('should handle loading states', async ({ page }) => {
+    // Intercept API requests to control loading state
+    await page.route('**/api/tokens**', async route => {
+      await page.waitForTimeout(1000) // Delay response
+      await route.continue()
+    })
+
     // Watch an address
-    const testAddress = '0x1234567890123456789012345678901234567890'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
+    await fillAddressAndWaitForModalClose(page)
 
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
-
-    // Immediately check for loading state (might be very brief)
+    // Check for loading state while request is delayed
     const loadingState = page.getByTestId('loading-state')
-    const loadingExists = await loadingState.isVisible().catch(() => false)
+    await expect(loadingState).toBeVisible()
 
-    // Loading state might appear briefly, or we might miss it
-    // The important thing is that the component handles loading gracefully
-    // Wait a bit and check final state
-    await page.waitForTimeout(2000)
-
-    // After loading, should show either tokens or empty state
+    // After loading completes, should show token list
     const tokenList = page.getByTestId('token-list')
     await expect(tokenList).toBeVisible()
   })
 
   test('should handle error states', async ({ page }) => {
+    // Intercept API requests and simulate failure
+    await page.route('**/api/tokens**', route => {
+      route.abort('failed')
+    })
+
     // Watch an address
-    const testAddress = '0x1234567890123456789012345678901234567890'
-    const modal = page.getByTestId('modal-overlay')
-    const addressInput = modal.getByTestId('address-input')
+    await fillAddressAndWaitForModalClose(page)
 
-    // Fill the address - the @input handler will auto-validate and close modal if valid
-    await addressInput.fill(testAddress)
-    // Don't blur - the input handler already processes it, and modal may close immediately
-    // Just wait for modal to close (it closes automatically when valid address is set)
-    await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 })
+    // Verify error state is displayed
+    const errorState = page.getByTestId('error-state')
+    await expect(errorState).toBeVisible()
 
-    // Wait for any API calls
-    await page.waitForTimeout(3000)
+    // Verify retry button is present
+    const retryButton = page.getByTestId('retry-button')
+    await expect(retryButton).toBeVisible()
 
-    // Check for error state (if API fails)
-    // The component should show error state if there's an error
     const tokenList = page.getByTestId('token-list')
     await expect(tokenList).toBeVisible()
-
-    // Error state would show retry button if there's an error
-    // This is handled by the component's error state
-    // We verify the component structure is intact
   })
 })

@@ -29,7 +29,7 @@ test.describe('Home Page E2E Tests', () => {
     // Body is always present, just check it exists
     const body = page.locator('body')
     await expect(body).toHaveCount(1)
-    await expect(page.locator('main, [role="main"], .main, #app').first()).toBeVisible()
+    await expect(page.getByRole('main')).toBeVisible()
   })
 
   test('should be responsive', async ({ page }) => {
