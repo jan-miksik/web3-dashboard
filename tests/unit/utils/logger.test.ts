@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 
 // The logger checks import.meta.dev at module initialization
 // Since it's already loaded, we'll test its actual behavior
-// In test environment, import.meta.dev should be true (development mode)
 import { logger } from '../../../app/utils/logger'
 
 describe('logger', () => {
