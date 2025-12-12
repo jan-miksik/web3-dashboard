@@ -312,9 +312,9 @@ function handleClickAllNetworks() {
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="error-state">
+    <div v-else-if="error" class="error-state" data-testid="error-state">
       <p class="error-text">{{ error }}</p>
-      <button class="retry-btn" @click="() => refetch()">Retry</button>
+      <button class="retry-btn" data-testid="retry-button" @click="() => refetch()">Retry</button>
     </div>
 
     <!-- Loading State -->
@@ -452,7 +452,7 @@ function handleClickAllNetworks() {
             </td>
             <td class="td-value">
               <div class="value-container">
-                <span class="usd-value" :class="{ 'has-value': token.usdValue > 0 }">
+                <span class="token-value usd-value" :class="{ 'has-value': token.usdValue > 0 }">
                   {{ formatUsdValue(token.usdValue) }}
                 </span>
                 <span class="balance-value">{{ formatBalance(token.formattedBalance) }}</span>
@@ -586,7 +586,7 @@ function handleClickAllNetworks() {
               </td>
               <td class="td-value">
                 <div class="value-container">
-                  <span class="usd-value" :class="{ 'has-value': token.usdValue > 0 }">
+                  <span class="token-value usd-value" :class="{ 'has-value': token.usdValue > 0 }">
                     {{ formatUsdValue(token.usdValue) }}
                   </span>
                   <span class="balance-value">{{ formatBalance(token.formattedBalance) }}</span>

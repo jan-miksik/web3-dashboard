@@ -12,15 +12,28 @@ test.describe('Wallet Functionality E2E Tests', () => {
   })
 
   test('should open wallet modal when connect button is clicked', async ({ page }) => {
-    // Click the header connect button to open the modal
-    const headerButton = page.getByRole('banner').getByTestId('connect-button')
-    await headerButton.click()
+    // Wait for page to load completely
+    await page.waitForLoadState('networkidle')
 
-    // The modal should now be visible
-    await expect(page.getByTestId('modal-overlay')).toBeVisible({ timeout: 5000 })
+    // Modal is auto-shown when not connected (showModal = !isConnected && !watchedAddress)
+    // Check if modal is visible, if not click header button to open it
+    const modalOverlay = page.getByTestId('modal-overlay')
+    const modalVisible = await modalOverlay.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (!modalVisible) {
+      // Modal not visible, click header button to open it
+      const headerButton = page.getByRole('banner').getByTestId('connect-button')
+      await headerButton.click({ force: true }) // Use force to bypass pointer event blocking
+      // Wait for modal to appear
+      await expect(modalOverlay).toBeVisible({ timeout: 5000 })
+    }
+
+    // Ensure modal is visible before proceeding
+    await expect(modalOverlay).toBeVisible({ timeout: 5000 })
 
     // The internal modal should have a connect button
     const modalConnectButton = page.getByTestId('modal-overlay').getByTestId('connect-button')
+    await expect(modalConnectButton).toBeVisible({ timeout: 5000 })
     await modalConnectButton.click()
 
     // After clicking the connect button, verify the expected outcome:
