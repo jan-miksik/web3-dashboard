@@ -57,9 +57,21 @@ async function handleRefresh() {
   }
 }
 
-const availableChains = computed(() => {
+// Get chains with assets
+const chainsWithAssets = computed(() => {
   const chainIds = new Set(tokens.value.map(t => t.chainId))
   return getAvailableChains(chainIds)
+})
+
+// Get chains without assets
+const chainsWithoutAssets = computed(() => {
+  const chainsWithAssetsIds = new Set(tokens.value.map(t => t.chainId))
+  return CHAIN_METADATA.filter(chain => !chainsWithAssetsIds.has(chain.id))
+})
+
+// All available chains, sorted: chains with assets first, then chains without assets
+const availableChains = computed(() => {
+  return [...chainsWithAssets.value, ...chainsWithoutAssets.value]
 })
 
 const highValueTokens = computed(() => {
@@ -98,6 +110,10 @@ const filteredTotalUsdValue = computed(() => {
 
 const hasLowValueAssets = computed(() => {
   return lowValueTokens.value.length > 0
+})
+
+const hasHighValueAssets = computed(() => {
+  return highValueTokens.value.length > 0
 })
 
 // Auto-show low-value assets if high-value tokens are empty (button would not be visible)
@@ -214,11 +230,7 @@ function handleClickAllNetworks() {
         </span>
       </div>
       <div class="header-actions">
-        <div
-          v-if="hasAddress && availableChains.length > 0"
-          ref="chainFilterRef"
-          class="network-filter-container"
-        >
+        <div v-if="hasAddress" ref="chainFilterRef" class="network-filter-container">
           <button
             class="network-filter-btn"
             data-testid="network-filter-btn"
@@ -242,8 +254,9 @@ function handleClickAllNetworks() {
                 <span class="option-name">All Networks</span>
                 <span v-if="selectedChainIds.size === 0" class="checkmark">✓</span>
               </button>
+              <!-- Chains with assets -->
               <button
-                v-for="chain in availableChains"
+                v-for="chain in chainsWithAssets"
                 :key="chain.id"
                 class="filter-option"
                 data-testid="network-filter-option"
@@ -261,9 +274,29 @@ function handleClickAllNetworks() {
                   <span class="option-name">{{ chain.name }}</span>
                 </div>
                 <div class="option-right">
-                  <span class="chain-type" :class="chain.type.toLowerCase()">
-                    {{ chain.type }}
-                  </span>
+                  <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
+                </div>
+              </button>
+              <!-- Chains without assets (with lower opacity) -->
+              <button
+                v-for="chain in chainsWithoutAssets"
+                :key="chain.id"
+                class="filter-option filter-option-no-assets"
+                data-testid="network-filter-option"
+                :class="{ selected: isChainSelected(chain.id) }"
+                @click="toggleChain(chain.id)"
+              >
+                <div class="option-left">
+                  <img
+                    v-if="chain.icon"
+                    :src="chain.icon"
+                    :alt="chain.name"
+                    class="chain-icon"
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                  />
+                  <span class="option-name">{{ chain.name }}</span>
+                </div>
+                <div class="option-right">
                   <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
                 </div>
               </button>
@@ -278,29 +311,7 @@ function handleClickAllNetworks() {
           title="Refresh balances"
           @click="handleRefresh"
         >
-          <svg
-            class="refresh-icon"
-            :class="{ spinning: isLoading || isRefreshing }"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M13.5 2.5L12.5 5.5L9.5 4.5M2.5 13.5L3.5 10.5L6.5 11.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M2.5 8C2.5 11.0376 4.96243 13.5 8 13.5C9.38959 13.5 10.6548 12.9775 11.6304 12.1047M13.5 8C13.5 4.96243 11.0376 2.5 8 2.5C6.61041 2.5 5.34518 3.02247 4.36964 3.89534"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-          </svg>
+          <span class="refresh-icon" :class="{ spinning: isLoading || isRefreshing }"> ↻ </span>
         </button>
       </div>
     </div>
@@ -348,7 +359,7 @@ function handleClickAllNetworks() {
     >
       <table
         class="token-table"
-        :class="{ loading: isLoading || isRefreshing }"
+        :class="{ loading: isLoading || isRefreshing, 'show-low-value': showLowValueAssets }"
         data-testid="token-table"
       >
         <tbody>
@@ -412,22 +423,21 @@ function handleClickAllNetworks() {
                         xmlns="http://www.w3.org/2000/svg"
                       >
                         <rect
-                          x="6"
-                          y="6"
+                          x="5.5"
+                          y="5.5"
                           width="8"
                           height="8"
+                          rx="1"
                           stroke="currentColor"
                           stroke-width="1.25"
                           fill="none"
                         />
-                        <rect
-                          x="2"
-                          y="2"
-                          width="8"
-                          height="8"
+                        <path
+                          d="M10.5 5.5V3.5C10.5 2.67157 9.82843 2 9 2H3.5C2.67157 2 2 2.67157 2 3.5V9C2 9.82843 2.67157 10.5 3.5 10.5H5.5"
                           stroke="currentColor"
                           stroke-width="1.25"
-                          fill="none"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
                         />
                       </svg>
                     </button>
@@ -475,7 +485,7 @@ function handleClickAllNetworks() {
 
           <!-- Low-value tokens (< $5) -->
           <template v-if="showLowValueAssets">
-            <tr class="divider-row">
+            <tr v-if="hasHighValueAssets" class="divider-row divider-row-animate">
               <td colspan="2" class="divider-cell">
                 <button
                   class="hide-low-value-btn"
@@ -487,9 +497,10 @@ function handleClickAllNetworks() {
               </td>
             </tr>
             <tr
-              v-for="token in lowValueTokens"
+              v-for="(token, index) in lowValueTokens"
               :key="`${token.chainId}-${token.address}`"
-              class="token-row"
+              class="token-row low-value-row"
+              :style="{ '--row-index': index }"
               data-testid="token-row"
             >
               <td class="td-token">
@@ -657,8 +668,8 @@ function handleClickAllNetworks() {
 }
 
 .refresh-icon {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   color: currentColor;
 }
 
@@ -881,6 +892,18 @@ function handleClickAllNetworks() {
   font-weight: 600;
 }
 
+.filter-option-no-assets {
+  opacity: 0.6;
+}
+
+.filter-option-no-assets:hover {
+  opacity: 0.8;
+}
+
+.filter-option-no-assets.selected {
+  opacity: 0.9;
+}
+
 .option-right {
   display: flex;
   align-items: center;
@@ -945,6 +968,7 @@ function handleClickAllNetworks() {
 /* Token Table */
 .table-container {
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 20px -20px;
   padding: 0 20px;
   transition: opacity 0.3s ease;
@@ -989,6 +1013,34 @@ function handleClickAllNetworks() {
 
 .token-row:hover {
   background: var(--bg-hover);
+}
+
+/* Low-value rows animation */
+.token-table.show-low-value .low-value-row {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  animation: fadeInSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: calc(var(--row-index, 0) * 0.05s);
+}
+
+.token-table.show-low-value .divider-row-animate {
+  opacity: 0;
+  transform: translateY(-8px);
+  animation: fadeInSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fadeInSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  60% {
+    transform: translateY(2px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .token-row td {

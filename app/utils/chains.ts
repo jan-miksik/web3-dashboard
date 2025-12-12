@@ -1,8 +1,7 @@
-// Chain metadata with icons, L1/L2 types, and Zerion mappings
+// Chain metadata with icons and Zerion mappings
 export interface ChainMetadata {
   id: number
   name: string
-  type: 'L1' | 'L2'
   zerionId: string
   icon?: string
   color: string
@@ -28,7 +27,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 1,
     name: 'Ethereum',
-    type: 'L1',
     zerionId: 'ethereum',
     icon: CHAIN_ICONS[1],
     color: '#627eea',
@@ -37,7 +35,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 137,
     name: 'Polygon',
-    type: 'L1',
     zerionId: 'polygon',
     icon: CHAIN_ICONS[137],
     color: '#8247e5',
@@ -46,7 +43,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 43114,
     name: 'Avalanche',
-    type: 'L1',
     zerionId: 'avalanche',
     icon: CHAIN_ICONS[43114],
     color: '#e84142',
@@ -55,7 +51,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 250,
     name: 'Fantom',
-    type: 'L1',
     zerionId: 'fantom',
     icon: CHAIN_ICONS[250],
     color: '#1969ff',
@@ -64,7 +59,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 42220,
     name: 'Celo',
-    type: 'L1',
     zerionId: 'celo',
     icon: CHAIN_ICONS[42220],
     color: '#35d07f',
@@ -73,7 +67,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 100,
     name: 'Gnosis',
-    type: 'L1',
     zerionId: 'xdai',
     icon: CHAIN_ICONS[100],
     color: '#04795b',
@@ -82,7 +75,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 8453,
     name: 'Base',
-    type: 'L2',
     zerionId: 'base',
     icon: CHAIN_ICONS[8453],
     color: '#0052ff',
@@ -91,7 +83,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 42161,
     name: 'Arbitrum',
-    type: 'L2',
     zerionId: 'arbitrum',
     icon: CHAIN_ICONS[42161],
     color: '#28a0f0',
@@ -100,7 +91,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 10,
     name: 'Optimism',
-    type: 'L2',
     zerionId: 'optimism',
     icon: CHAIN_ICONS[10],
     color: '#ff0420',
@@ -109,7 +99,6 @@ export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 324,
     name: 'zkSync Era',
-    type: 'L2',
     zerionId: 'zksync-era',
     icon: CHAIN_ICONS[324],
     color: '#8c8dfc',

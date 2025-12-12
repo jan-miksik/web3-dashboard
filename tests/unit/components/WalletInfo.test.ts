@@ -92,7 +92,6 @@ describe('WalletInfo', () => {
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Watch Mode')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="address-full"]').text()).toBe(watchedAddr)
-    expect(wrapper.find('[data-testid="watch-mode-actions"]').exists()).toBe(true)
   })
 
   it('should copy address to clipboard when copy button is clicked', async () => {
@@ -110,22 +109,6 @@ describe('WalletInfo', () => {
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address)
     expect(wrapper.find('.copy-btn.copied').exists()).toBe(true)
-  })
-
-  it('should clear watched address when stop watching is clicked', async () => {
-    mockWatchedAddress.value = '0x9876543210987654321098765432109876543210'
-    mockUseConnection.mockReturnValue({
-      isConnected: ref(false),
-      address: ref(null),
-    } as unknown as ReturnType<typeof useConnection>)
-
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
-
-    const clearButton = wrapper.find('[data-testid="clear-watch-btn"]')
-    await clearButton.trigger('click')
-
-    expect(mockClearWatchedAddress).toHaveBeenCalled()
   })
 
   it('should handle copy error gracefully', async () => {

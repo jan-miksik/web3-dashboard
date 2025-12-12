@@ -1,7 +1,49 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+
 const hasProjectId = import.meta.env.NUXT_REOWN_PROJECT_ID !== ''
 
 const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]
+
+// Calculate and reserve scrollbar width to prevent layout shift
+const scrollbarWidth = ref(0)
+const wrapperRef = ref<HTMLElement | null>(null)
+
+function calculateScrollbarWidth(): number {
+  if (typeof window === 'undefined') return 0
+
+  // Create a temporary element to measure scrollbar width
+  const outer = document.createElement('div')
+  outer.style.visibility = 'hidden'
+  outer.style.overflow = 'scroll'
+  outer.style.width = '100px'
+  outer.style.position = 'absolute'
+  outer.style.top = '-9999px'
+  document.body.appendChild(outer)
+
+  const inner = document.createElement('div')
+  inner.style.width = '100%'
+  outer.appendChild(inner)
+
+  const width = outer.offsetWidth - inner.offsetWidth
+  outer.parentNode?.removeChild(outer)
+
+  return width
+}
+
+onMounted(() => {
+  scrollbarWidth.value = calculateScrollbarWidth()
+
+  // Update on resize (in case zoom level changes scrollbar width)
+  const handleResize = () => {
+    scrollbarWidth.value = calculateScrollbarWidth()
+  }
+  window.addEventListener('resize', handleResize)
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
+})
 </script>
 
 <template>
@@ -31,9 +73,17 @@ const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: tru
     <!-- Main Container -->
     <div class="main-container">
       <!-- Main Content -->
-      <main class="main-content">
-        <slot />
-      </main>
+      <div class="main-content-outer">
+        <div
+          ref="wrapperRef"
+          class="main-content-wrapper"
+          :style="{ '--scrollbar-width': `${scrollbarWidth}px` }"
+        >
+          <main class="main-content">
+            <slot />
+          </main>
+        </div>
+      </div>
     </div>
 
     <!-- Bottom Navigation (Mobile) -->
@@ -54,10 +104,11 @@ const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: tru
 
 <style scoped>
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
+  overflow: hidden;
 }
 
 /* Header */
@@ -124,6 +175,35 @@ const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: tru
 .main-container {
   display: flex;
   flex: 1;
+  overflow: hidden; /* Prevent body scroll */
+  min-height: 0; /* Allow flex item to shrink */
+}
+
+/* Main Content Outer - reserves space for scrollbar */
+.main-content-outer {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  padding-right: var(--scrollbar-width, 0px);
+  box-sizing: border-box;
+  min-height: 0; /* Allow flex item to shrink */
+}
+
+/* Main Content Wrapper */
+.main-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable; /* Reserve space for scrollbar (modern browsers) */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0; /* Allow flex item to shrink and enable scrolling */
+}
+
+/* Main Content */
+.main-content {
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
 }
 
 /* Sidebar */
@@ -170,14 +250,6 @@ const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: tru
 
 .sidebar-label {
   font-size: 14px;
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  min-height: calc(100vh - 64px);
 }
 
 /* Bottom Navigation (Mobile) */

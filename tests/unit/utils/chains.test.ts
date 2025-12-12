@@ -16,7 +16,6 @@ describe('chains utils', () => {
       expect(ethereum).toBeDefined()
       expect(ethereum?.id).toBe(1)
       expect(ethereum?.name).toBe('Ethereum')
-      expect(ethereum?.type).toBe('L1')
       expect(ethereum?.zerionId).toBe('ethereum')
     })
 
@@ -112,8 +111,6 @@ describe('chains utils', () => {
       CHAIN_METADATA.forEach(chain => {
         expect(chain.id).toBeDefined()
         expect(chain.name).toBeDefined()
-        expect(chain.type).toBeDefined()
-        expect(['L1', 'L2']).toContain(chain.type)
         expect(chain.zerionId).toBeDefined()
         expect(chain.color).toBeDefined()
         expect(chain.bgColor).toBeDefined()

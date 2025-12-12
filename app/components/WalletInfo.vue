@@ -6,7 +6,7 @@ import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import { handleError } from '~/utils/error-handler'
 
 const { address, isConnected } = useConnection({ config })
-const { watchedAddress, clearWatchedAddress } = useWatchedAddress()
+const { watchedAddress } = useWatchedAddress()
 
 const effectiveAddress = computed(() => {
   if (isConnected.value && address.value) {
@@ -90,22 +90,21 @@ async function copyAddress() {
               xmlns="http://www.w3.org/2000/svg"
             >
               <rect
-                x="6"
-                y="6"
+                x="5.5"
+                y="5.5"
                 width="8"
                 height="8"
+                rx="1"
                 stroke="currentColor"
                 stroke-width="1.25"
                 fill="none"
               />
-              <rect
-                x="2"
-                y="2"
-                width="8"
-                height="8"
+              <path
+                d="M10.5 5.5V3.5C10.5 2.67157 9.82843 2 9 2H3.5C2.67157 2 2 2.67157 2 3.5V9C2 9.82843 2.67157 10.5 3.5 10.5H5.5"
                 stroke="currentColor"
                 stroke-width="1.25"
-                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               />
             </svg>
             <svg
@@ -127,12 +126,6 @@ async function copyAddress() {
             </svg>
           </button>
         </div>
-      </div>
-
-      <div v-if="isWatchMode" class="watch-mode-actions" data-testid="watch-mode-actions">
-        <button class="clear-watch-btn" data-testid="clear-watch-btn" @click="clearWatchedAddress">
-          Stop Watching
-        </button>
       </div>
     </div>
 
@@ -312,29 +305,5 @@ async function copyAddress() {
 .disconnect-text {
   color: var(--text-secondary);
   font-size: 14px;
-}
-
-.watch-mode-actions {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-
-.clear-watch-btn {
-  width: 100%;
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.clear-watch-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-light);
 }
 </style>

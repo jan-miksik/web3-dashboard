@@ -33,13 +33,13 @@ vi.mock('../../../app/composables/useWatchedAddress', () => ({
 
 vi.mock('../../../app/utils/chains', () => ({
   CHAIN_METADATA: [
-    { id: 1, name: 'Ethereum', type: 'L1' },
-    { id: 137, name: 'Polygon', type: 'L2' },
+    { id: 1, name: 'Ethereum' },
+    { id: 137, name: 'Polygon' },
   ],
   getChainMetadata: (id: number) => {
-    const map: Record<number, { id: number; name: string; type: string; icon?: string }> = {
-      1: { id: 1, name: 'Ethereum', type: 'L1' },
-      137: { id: 137, name: 'Polygon', type: 'L2' },
+    const map: Record<number, { id: number; name: string; icon?: string }> = {
+      1: { id: 1, name: 'Ethereum' },
+      137: { id: 137, name: 'Polygon' },
     }
     return map[id]
   },
@@ -168,5 +168,85 @@ describe('TokenList', () => {
     mockIsLoading.value = true
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="refresh-btn"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('does not show hide button when there are no high-value assets', async () => {
+    // Only low-value assets (no assets >= $5)
+    mockTokens.value = [
+      {
+        symbol: 'DUST1',
+        name: 'Dust Token 1',
+        address: '0x1111111111111111111111111111111111111111',
+        decimals: 18,
+        formattedBalance: '1',
+        chainId: 1,
+        chainName: 'Ethereum',
+        usdPrice: 1,
+        usdValue: 1,
+        tokenType: 'erc20',
+        logoURI: null,
+      },
+      {
+        symbol: 'DUST2',
+        name: 'Dust Token 2',
+        address: '0x2222222222222222222222222222222222222222',
+        decimals: 18,
+        formattedBalance: '2',
+        chainId: 1,
+        chainName: 'Ethereum',
+        usdPrice: 1,
+        usdValue: 2,
+        tokenType: 'erc20',
+        logoURI: null,
+      },
+    ]
+
+    const wrapper = mount(TokenList)
+
+    // Low-value assets should be auto-shown (no high-value assets)
+    // But hide button should NOT be visible since there are no high-value assets
+    expect(wrapper.find('[data-testid="hide-low-value-btn"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(2) // both low-value tokens visible
+  })
+
+  it('shows hide button only when there are high-value assets', async () => {
+    // Mix of high-value and low-value assets
+    mockTokens.value = [
+      {
+        symbol: 'ETH',
+        name: 'Ethereum',
+        address: '0x0000000000000000000000000000000000000000',
+        decimals: 18,
+        formattedBalance: '1',
+        chainId: 1,
+        chainName: 'Ethereum',
+        usdPrice: 2000,
+        usdValue: 2000,
+        tokenType: 'native',
+        logoURI: null,
+      },
+      {
+        symbol: 'DUST',
+        name: 'Dust',
+        address: '0x1111111111111111111111111111111111111111',
+        decimals: 18,
+        formattedBalance: '0.5',
+        chainId: 1,
+        chainName: 'Ethereum',
+        usdPrice: 1,
+        usdValue: 0.5,
+        tokenType: 'erc20',
+        logoURI: null,
+      },
+    ]
+
+    const wrapper = mount(TokenList)
+
+    // Show low-value assets
+    await wrapper.find('[data-testid="show-low-value-btn"]').trigger('click')
+
+    // Hide button should be visible because there are high-value assets
+    expect(wrapper.find('[data-testid="hide-low-value-btn"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(2)
   })
 })
