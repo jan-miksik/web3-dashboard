@@ -1,8 +1,33 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { config } from '~/chains-config'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
+
+// Constants
+const ERROR_MESSAGES = {
+  INVALID_ADDRESS: 'Invalid Ethereum address format',
+  EMPTY_ADDRESS: 'Please enter an address',
+} as const
+
+const SUCCESS_MESSAGES = {
+  ADDRESS_ADDED: 'Address successfully added!',
+} as const
+
+const UI_TEXT = {
+  MODAL_TITLE: 'Connect Wallet or Watch Address',
+  WATCH_ADDRESS_LABEL: 'Watch Address',
+  WATCHING_LABEL: 'Watching:',
+  CLEAR_BUTTON: 'Clear',
+  DIVIDER_TEXT: 'OR',
+  PLACEHOLDER: '0x...',
+} as const
+
+const VALIDATION = {
+  ETHEREUM_ADDRESS_LENGTH: 42,
+  DEBOUNCE_DELAY_MS: 500,
+  SUCCESS_MESSAGE_DURATION_MS: 3000,
+} as const
 
 const { isConnected } = useConnection({ config })
 const { watchedAddress, setWatchedAddress, clearWatchedAddress, isValidAddress } =
@@ -10,6 +35,9 @@ const { watchedAddress, setWatchedAddress, clearWatchedAddress, isValidAddress }
 
 const addressInput = ref('')
 const addressError = ref('')
+const addressSuccess = ref(false)
+const modalContentRef = ref<HTMLElement | null>(null)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const showModal = computed(() => !isConnected.value && !watchedAddress.value)
 
@@ -19,52 +47,214 @@ watch(isConnected, connected => {
   }
 })
 
-function handleAddressInput(value: string) {
-  addressInput.value = value
-  addressError.value = ''
+// Focus trap: Watch for modal visibility and manage focus
+watch(showModal, async isVisible => {
+  if (isVisible) {
+    await nextTick()
+    focusFirstElement()
+    setupFocusTrap()
+  } else {
+    removeFocusTrap()
+  }
+})
 
-  const trimmed = value.trim()
+function focusFirstElement() {
+  if (!modalContentRef.value) return
 
-  if (trimmed && isValidAddress(trimmed)) {
-    setWatchedAddress(trimmed.toLowerCase())
-    addressInput.value = ''
-    addressError.value = ''
-  } else if (trimmed && !isValidAddress(trimmed)) {
-    addressError.value = 'Invalid Ethereum address format'
+  // Find first focusable element in modal
+  const focusableSelectors =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  const firstFocusable = modalContentRef.value.querySelector(
+    focusableSelectors
+  ) as HTMLElement | null
+
+  if (firstFocusable) {
+    firstFocusable.focus()
   }
 }
 
-function handleWatchAddress() {
-  const trimmed = addressInput.value.trim()
+let focusTrapHandler: ((e: KeyboardEvent) => void) | null = null
+
+function setupFocusTrap() {
+  focusTrapHandler = (e: KeyboardEvent) => {
+    if (!showModal.value || !modalContentRef.value) return
+
+    // Handle Tab key for focus trapping
+    if (e.key === 'Tab') {
+      const focusableSelectors =
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      const focusableElements = Array.from(
+        modalContentRef.value.querySelectorAll<HTMLElement>(focusableSelectors)
+      )
+
+      if (focusableElements.length === 0) return
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+
+      if (!firstElement || !lastElement) return
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault()
+          lastElement.focus()
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault()
+          firstElement.focus()
+        }
+      }
+    }
+  }
+
+  document.addEventListener('keydown', focusTrapHandler)
+}
+
+function removeFocusTrap() {
+  if (focusTrapHandler) {
+    document.removeEventListener('keydown', focusTrapHandler)
+  }
+}
+
+function clearError() {
+  addressError.value = ''
+}
+
+function showSuccess() {
+  addressSuccess.value = true
+  setTimeout(() => {
+    addressSuccess.value = false
+  }, VALIDATION.SUCCESS_MESSAGE_DURATION_MS)
+}
+
+function validateAndSetAddress(address: string, autoWatch = false): boolean {
+  const trimmed = address.trim()
 
   if (!trimmed) {
-    addressError.value = 'Please enter an address'
-    return
+    if (!autoWatch) {
+      addressError.value = ERROR_MESSAGES.EMPTY_ADDRESS
+    }
+    return false
   }
 
   if (!isValidAddress(trimmed)) {
-    addressError.value = 'Invalid Ethereum address format'
-    return
+    addressError.value = ERROR_MESSAGES.INVALID_ADDRESS
+    return false
   }
 
   setWatchedAddress(trimmed.toLowerCase())
   addressInput.value = ''
-  addressError.value = ''
+  clearError()
+  showSuccess()
+  return true
+}
+
+function handleCloseModal() {
+  // Clear watched address if one is set, which will close the modal
+  if (watchedAddress.value) {
+    clearWatchedAddress()
+    addressInput.value = ''
+    clearError()
+    addressSuccess.value = false
+  }
+}
+
+function handleEscapeKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    handleCloseModal()
+  }
+}
+
+function handleInputEvent(e: Event) {
+  const target = e.target as HTMLInputElement
+  handleAddressInput(target.value)
+}
+
+function handleAddressInput(value: string) {
+  addressInput.value = value
+  clearError()
+  addressSuccess.value = false
+
+  // Clear existing debounce timer
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+
+  const trimmed = value.trim()
+
+  // Only validate and auto-watch if address is complete and valid
+  if (trimmed && trimmed.length >= VALIDATION.ETHEREUM_ADDRESS_LENGTH) {
+    // Debounce auto-watch
+    debounceTimer = setTimeout(() => {
+      validateAndSetAddress(trimmed, true)
+    }, VALIDATION.DEBOUNCE_DELAY_MS)
+  } else if (trimmed && trimmed.length > 0) {
+    // Show error immediately for incomplete addresses
+    if (!isValidAddress(trimmed)) {
+      addressError.value = ERROR_MESSAGES.INVALID_ADDRESS
+    }
+  }
+}
+
+function handleBlur() {
+  // Validate on blur without auto-watching
+  const trimmed = addressInput.value.trim()
+
+  if (!trimmed) {
+    // Don't show error on blur if field is empty
+    return
+  }
+
+  if (!isValidAddress(trimmed)) {
+    addressError.value = ERROR_MESSAGES.INVALID_ADDRESS
+  } else {
+    clearError()
+  }
+}
+
+function handleWatchAddress() {
+  validateAndSetAddress(addressInput.value, false)
 }
 
 function handleClearWatch() {
   clearWatchedAddress()
   addressInput.value = ''
-  addressError.value = ''
+  clearError()
+  addressSuccess.value = false
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
 }
+
+onUnmounted(() => {
+  removeFocusTrap()
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+})
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="showModal" class="modal-overlay" data-testid="modal-overlay">
-        <div class="modal-content">
+      <div
+        v-if="showModal"
+        class="modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        data-testid="modal-overlay"
+        @click.self="handleCloseModal"
+        @keydown.esc="handleEscapeKey"
+      >
+        <div ref="modalContentRef" class="modal-content">
           <div class="modal-body">
+            <h2 id="modal-title" class="sr-only">{{ UI_TEXT.MODAL_TITLE }}</h2>
             <!-- Connect Wallet Section -->
             <div class="connect-section">
               <div class="connect-button-wrapper">
@@ -74,12 +264,12 @@ function handleClearWatch() {
 
             <!-- Divider -->
             <div class="divider">
-              <span class="divider-text">OR</span>
+              <span class="divider-text">{{ UI_TEXT.DIVIDER_TEXT }}</span>
             </div>
 
             <!-- Watch Address Section -->
             <div class="watch-section">
-              <label class="input-label">Watch Address</label>
+              <label class="input-label">{{ UI_TEXT.WATCH_ADDRESS_LABEL }}</label>
 
               <div
                 v-if="watchedAddress"
@@ -87,11 +277,11 @@ function handleClearWatch() {
                 data-testid="watched-address-display"
               >
                 <div class="watched-info">
-                  <span class="watched-label">Watching:</span>
+                  <span class="watched-label">{{ UI_TEXT.WATCHING_LABEL }}</span>
                   <span class="watched-address font-mono">{{ watchedAddress }}</span>
                 </div>
                 <button class="clear-btn" data-testid="clear-watch-btn" @click="handleClearWatch">
-                  Clear
+                  {{ UI_TEXT.CLEAR_BUTTON }}
                 </button>
               </div>
 
@@ -99,17 +289,24 @@ function handleClearWatch() {
                 <input
                   v-model="addressInput"
                   type="text"
-                  placeholder="0x..."
+                  :placeholder="UI_TEXT.PLACEHOLDER"
                   class="address-input"
                   data-testid="address-input"
-                  :class="{ error: addressError }"
-                  @input="(e: Event) => handleAddressInput((e.target as HTMLInputElement).value)"
-                  @blur="handleAddressInput(addressInput)"
-                  @keyup.enter="() => handleWatchAddress()"
+                  :class="{ error: addressError, success: addressSuccess }"
+                  @input="handleInputEvent"
+                  @blur="handleBlur"
+                  @keyup.enter="handleWatchAddress"
                 />
-                <p v-if="addressError" class="error-message" data-testid="address-error">
-                  {{ addressError }}
-                </p>
+                <Transition name="message">
+                  <p v-if="addressError" class="error-message" data-testid="address-error">
+                    {{ addressError }}
+                  </p>
+                </Transition>
+                <Transition name="message">
+                  <p v-if="addressSuccess" class="success-message" data-testid="address-success">
+                    {{ SUCCESS_MESSAGES.ADDRESS_ADDED }}
+                  </p>
+                </Transition>
               </div>
             </div>
           </div>
@@ -182,6 +379,7 @@ function handleClearWatch() {
 .watch-section {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
 .connect-section {
@@ -219,12 +417,6 @@ function handleClearWatch() {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.watch-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .watched-address-display {
@@ -302,6 +494,10 @@ function handleClearWatch() {
   border-color: var(--error);
 }
 
+.address-input.success {
+  border-color: var(--success, #10b981);
+}
+
 .address-input::placeholder {
   color: var(--text-muted);
 }
@@ -312,10 +508,35 @@ function handleClearWatch() {
   margin-top: -8px;
 }
 
-.help-text {
-  color: var(--text-muted);
+.success-message {
+  color: var(--success, #10b981);
   font-size: 12px;
   margin-top: -8px;
+}
+
+.message-enter-active,
+.message-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.message-enter-from,
+.message-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .modal-enter-active,
