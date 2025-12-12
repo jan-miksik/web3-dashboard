@@ -46,7 +46,7 @@ describe('ConnectButton', () => {
 
     const wrapper = mount(ConnectButton)
     await wrapper.vm.$nextTick()
-    
+
     expect(wrapper.find('[data-testid="connect-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="connect-button-text"]').text()).toContain('Connect Wallet')
     // Check that connected class is not present
@@ -62,7 +62,7 @@ describe('ConnectButton', () => {
 
     const wrapper = mount(ConnectButton)
     await wrapper.vm.$nextTick()
-    
+
     expect(wrapper.find('[data-testid="connect-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="connect-button-text"]').text()).toContain('Wallet Menu')
     expect(wrapper.find('[data-testid="connect-button"]').classes()).toContain('connected')
@@ -74,16 +74,16 @@ describe('ConnectButton', () => {
       open: mockOpen,
       close: vi.fn(),
     } as unknown as ReturnType<typeof useAppKit>)
-    
+
     mockUseConnection.mockReturnValue({
       isConnected: ref(false),
       address: ref(null),
     } as unknown as Parameters<typeof mockUseConnection.mockReturnValue>[0])
 
     const wrapper = mount(ConnectButton)
-    
+
     await wrapper.find('[data-testid="connect-button"]').trigger('click')
-    
+
     expect(mockOpen).toHaveBeenCalled()
   })
 })

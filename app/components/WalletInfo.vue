@@ -8,7 +8,6 @@ import { handleError } from '~/utils/error-handler'
 const { address, isConnected } = useConnection({ config })
 const { watchedAddress, clearWatchedAddress } = useWatchedAddress()
 
-// Use watched address if in watch mode, otherwise use connected address
 const effectiveAddress = computed(() => {
   if (isConnected.value && address.value) {
     return address.value
@@ -26,23 +25,16 @@ const isWatchMode = computed(() => !isConnected.value && !!watchedAddress.value)
 const isCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
 
-function shortenAddress(address: string): string {
-  if (!address) return ''
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
-
 async function copyAddress() {
   if (effectiveAddress.value) {
     try {
       await navigator.clipboard.writeText(effectiveAddress.value)
       isCopied.value = true
-      
-      // Clear any existing timeout
+
       if (copyTimeout) {
         clearTimeout(copyTimeout)
       }
-      
-      // Reset after 2 seconds
+
       copyTimeout = setTimeout(() => {
         isCopied.value = false
       }, 2000)
@@ -61,8 +53,8 @@ async function copyAddress() {
   <div class="card wallet-info">
     <div class="card-header">
       <h3 class="card-title">Wallet</h3>
-      <span 
-        class="status-badge" 
+      <span
+        class="status-badge"
         data-testid="status-badge"
         :class="isConnected ? 'connected' : isWatchMode ? 'watch-mode' : 'disconnected'"
       >
@@ -73,23 +65,65 @@ async function copyAddress() {
     <div v-if="isConnected || isWatchMode" class="wallet-details" data-testid="wallet-details">
       <div class="detail-row">
         <div class="address-container">
-          <span class="detail-value font-mono address-full" data-testid="address-full">{{ effectiveAddress }}</span>
-          <span class="detail-value font-mono address-short" data-testid="address-short">{{ shortAddress }}</span>
-          <button 
-            class="copy-btn" 
+          <span class="detail-value font-mono address-full" data-testid="address-full">{{
+            effectiveAddress
+          }}</span>
+          <span class="detail-value font-mono address-short" data-testid="address-short">{{
+            shortAddress
+          }}</span>
+          <button
+            class="copy-btn"
             data-testid="copy-address-btn"
             :class="{ copied: isCopied }"
-            :title="isCopied ? 'Copied!' : 'Copy address'" 
+            :title="isCopied ? 'Copied!' : 'Copy address'"
             @click="copyAddress"
           >
             <span class="address-short-display address-display-full">{{ effectiveAddress }}</span>
             <span class="address-short-display address-display-short">{{ shortAddress }}</span>
-            <svg v-if="!isCopied" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
-              <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+            <svg
+              v-if="!isCopied"
+              class="copy-icon"
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="6"
+                y="6"
+                width="8"
+                height="8"
+                stroke="currentColor"
+                stroke-width="1.25"
+                fill="none"
+              />
+              <rect
+                x="2"
+                y="2"
+                width="8"
+                height="8"
+                stroke="currentColor"
+                stroke-width="1.25"
+                fill="none"
+              />
             </svg>
-            <svg v-else class="copy-icon check-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg
+              v-else
+              class="copy-icon check-icon"
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 8L6.5 11.5L13 5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -182,12 +216,11 @@ async function copyAddress() {
   display: inline-block;
 }
 
-/* Show full address on desktop, hide short */
 @media (min-width: 768px) {
   .address-display-full {
     display: inline-block;
   }
-  
+
   .address-display-short {
     display: none;
   }

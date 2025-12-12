@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { ref, computed } from 'vue'
 import ConnectWalletModal from '../../../app/components/ConnectWalletModal.vue'
 import { useConnection } from '@wagmi/vue'
-import { useWatchedAddress } from '../../../app/composables/useWatchedAddress'
+import type { useWatchedAddress as _useWatchedAddress } from '../../../app/composables/useWatchedAddress'
 
 // Mock @wagmi/vue (hoisted to avoid initialization errors)
 const { mockUseConnection } = vi.hoisted(() => ({
@@ -68,7 +68,7 @@ describe('ConnectWalletModal', () => {
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()
-    
+
     expect(wrapper.find('[data-testid="modal-overlay"]').exists()).toBe(true)
   })
 
@@ -78,7 +78,7 @@ describe('ConnectWalletModal', () => {
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()
-    
+
     expect(wrapper.find('[data-testid="modal-overlay"]').exists()).toBe(false)
   })
 
@@ -89,7 +89,7 @@ describe('ConnectWalletModal', () => {
     mockWatchedAddress.value = '0x1234567890123456789012345678901234567890'
 
     const wrapper = mountModal()
-    
+
     expect(wrapper.find('[data-testid="modal-overlay"]').exists()).toBe(false)
   })
 
@@ -100,48 +100,50 @@ describe('ConnectWalletModal', () => {
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()
-    
+
     // Simulate wallet connection
     isConnectedRef.value = true
     await wrapper.vm.$nextTick()
-    
+
     expect(mockClearWatchedAddress).toHaveBeenCalled()
   })
 
   it('should handle address input and auto-watch valid address', async () => {
     mockIsValidAddress.mockReturnValue(true)
-    
+
     const wrapper = mountModal()
     const input = wrapper.find('[data-testid="address-input"]')
-    
+
     await input.setValue('0x1234567890123456789012345678901234567890')
     await input.trigger('input')
-    
+
     expect(mockSetWatchedAddress).toHaveBeenCalledWith('0x1234567890123456789012345678901234567890')
   })
 
   it('should show error for invalid address input', async () => {
     mockIsValidAddress.mockReturnValue(false)
-    
+
     const wrapper = mountModal()
     const input = wrapper.find('[data-testid="address-input"]')
-    
+
     await input.setValue('invalid-address')
     await input.trigger('input')
-    
+
     expect(wrapper.find('[data-testid="address-error"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="address-error"]').text()).toContain('Invalid Ethereum address format')
+    expect(wrapper.find('[data-testid="address-error"]').text()).toContain(
+      'Invalid Ethereum address format'
+    )
   })
 
   it('should handle watch address submission', async () => {
     mockIsValidAddress.mockReturnValue(true)
-    
+
     const wrapper = mountModal()
     const input = wrapper.find('[data-testid="address-input"]')
-    
+
     await input.setValue('0x1234567890123456789012345678901234567890')
     await input.trigger('keyup.enter')
-    
+
     expect(mockSetWatchedAddress).toHaveBeenCalledWith('0x1234567890123456789012345678901234567890')
   })
 
@@ -149,10 +151,7 @@ describe('ConnectWalletModal', () => {
     const wrapper = mountModal()
     await (wrapper.vm as any).handleWatchAddress()
     await wrapper.vm.$nextTick()
-    
+
     expect(wrapper.find('[data-testid="address-error"]').exists()).toBe(true)
   })
-
-
 })
-

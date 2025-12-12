@@ -117,11 +117,7 @@ function showNotification(
   // - Vue Toastification
   // - Custom notification composable
 
-  // For now, we'll use a simple approach that can be enhanced later
   if (isClient) {
-    // Client-side only
-    // You can replace this with your actual notification system
-    // eslint-disable-next-line no-console
     console.warn(`[Notification ${type}]: ${message}`)
 
     // Example integration (uncomment and adapt to your notification system):
@@ -165,7 +161,6 @@ export function handleError(error: unknown, options: ErrorHandlerOptions = {}): 
 
   const userMessage = getUserFriendlyMessage(error, customMessage)
 
-  // Log the error
   if (shouldLogError) {
     logger.error(customMessage || 'An error occurred', error, {
       ...context,
@@ -174,7 +169,6 @@ export function handleError(error: unknown, options: ErrorHandlerOptions = {}): 
     })
   }
 
-  // Show notification to user
   if (shouldShowNotification && isClient) {
     showNotification(userMessage, 'error', isClient)
   }

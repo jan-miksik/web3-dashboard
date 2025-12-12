@@ -1,9 +1,7 @@
 <script setup lang="ts">
 const hasProjectId = import.meta.env.NUXT_REOWN_PROJECT_ID !== ''
 
-const sidebarItems = [
-  { icon: '📊', label: 'Dashboard', path: '/', active: true },
-]
+const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]
 </script>
 
 <template>
@@ -15,13 +13,13 @@ const sidebarItems = [
           <span class="logo-text">Web3 Dashboard</span>
         </div>
       </div>
-      
+
       <div class="header-right">
         <!-- Show AppKit button when Project ID is configured -->
         <template v-if="hasProjectId">
           <ConnectButton />
         </template>
-        
+
         <!-- Show setup message when no Project ID -->
         <div v-else class="setup-message">
           <span class="setup-icon">⚙️</span>
@@ -40,8 +38,8 @@ const sidebarItems = [
 
     <!-- Bottom Navigation (Mobile) -->
     <nav class="bottom-nav">
-      <NuxtLink 
-        v-for="item in sidebarItems" 
+      <NuxtLink
+        v-for="item in sidebarItems"
         :key="item.path"
         :to="item.path"
         class="bottom-nav-item"

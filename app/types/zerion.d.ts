@@ -100,4 +100,3 @@ export interface ZerionApiResponse {
   status?: number
   message?: string
 }
-

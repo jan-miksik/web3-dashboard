@@ -1,18 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // The logger checks import.meta.dev at module initialization
 // Since it's already loaded, we'll test its actual behavior
 import { logger } from '../../../app/utils/logger'
 
 describe('logger', () => {
-  let consoleDebugSpy: ReturnType<typeof vi.spyOn>
-  let consoleInfoSpy: ReturnType<typeof vi.spyOn>
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
-    consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'debug').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })

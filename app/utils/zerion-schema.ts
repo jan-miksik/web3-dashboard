@@ -17,9 +17,11 @@ export const ZerionValueSchema = z.object({
   float: z.number().optional(),
 })
 
-export const ZerionIconSchema = z.object({
-  url: z.string(),
-}).nullable()
+export const ZerionIconSchema = z
+  .object({
+    url: z.string(),
+  })
+  .nullable()
 
 export const ZerionFlagsSchema = z.object({
   verified: z.boolean().optional(),
@@ -50,9 +52,11 @@ export const ZerionRelationshipDataSchema = z.object({
 
 export const ZerionRelationshipSchema = z.object({
   data: ZerionRelationshipDataSchema.optional(),
-  links: z.object({
-    related: z.string(),
-  }).optional(),
+  links: z
+    .object({
+      related: z.string(),
+    })
+    .optional(),
 })
 
 export const ZerionPositionAttributesSchema = z.object({
@@ -63,10 +67,13 @@ export const ZerionPositionAttributesSchema = z.object({
   quantity: ZerionQuantitySchema.optional(),
   price: z.union([z.number(), ZerionPriceSchema]).nullable().optional(),
   value: z.union([z.number(), ZerionValueSchema]).nullable().optional(),
-  changes: z.object({
-    absolute_1d: z.number().optional(),
-    percent_1d: z.number().optional(),
-  }).nullable().optional(),
+  changes: z
+    .object({
+      absolute_1d: z.number().optional(),
+      percent_1d: z.number().optional(),
+    })
+    .nullable()
+    .optional(),
   fungible_info: ZerionFungibleInfoSchema.optional(),
   flags: ZerionFlagsSchema.optional(),
   updated_at: z.string().optional(),
@@ -94,12 +101,13 @@ export const ZerionIncludedItemSchema = z.object({
 export const ZerionApiResponseSchema = z.object({
   data: z.array(ZerionPositionSchema).optional(),
   included: z.array(ZerionIncludedItemSchema).optional(),
-  links: z.object({
-    self: z.string().optional(),
-    next: z.string().optional(),
-    prev: z.string().optional(),
-  }).optional(),
+  links: z
+    .object({
+      self: z.string().optional(),
+      next: z.string().optional(),
+      prev: z.string().optional(),
+    })
+    .optional(),
   status: z.number().optional(),
   message: z.string().optional(),
 })
-

@@ -3,7 +3,8 @@ import type { RuntimeConfig } from 'nuxt/schema'
 import type { ZerionPosition } from '../../../../../app/types/zerion.d'
 
 // Type for config that only includes what we need for testing
-type MockRuntimeConfig = Pick<RuntimeConfig, 'zerionApiKey'> & Partial<Omit<RuntimeConfig, 'zerionApiKey'>>
+type MockRuntimeConfig = Pick<RuntimeConfig, 'zerionApiKey'> &
+  Partial<Omit<RuntimeConfig, 'zerionApiKey'>>
 
 // Types for mock functions
 interface CreateErrorOptions {
@@ -66,7 +67,7 @@ vi.mock('../../../../../app/utils/chains', () => ({
 
 vi.mock('../../../../../app/utils/zerion-schema', () => ({
   ZerionApiResponseSchema: {
-    safeParse: vi.fn(<T,>(data: T) => ({
+    safeParse: vi.fn(<T>(data: T) => ({
       success: true as const,
       data,
     })),
@@ -84,17 +85,20 @@ describe('server/api/zerion/positions.get', () => {
   })
 
   it('should return error when wallet address is missing', async () => {
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     getQuery.mockReturnValue({})
 
     // Use dependency injection
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: 'test-api-key',
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: 'test-api-key',
+      })
+    )
 
     const event = createEvent({})
-    
+
     await expect(handlePositionsRequest(event, getConfig)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -105,19 +109,22 @@ describe('server/api/zerion/positions.get', () => {
   })
 
   it('should return error when API key is missing', async () => {
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     getQuery.mockReturnValue({
       address: '0x1234567890123456789012345678901234567890',
     })
 
     // Use dependency injection with empty API key
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: '',
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: '',
+      })
+    )
 
     const event = createEvent({})
-    
+
     await expect(handlePositionsRequest(event, getConfig)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -129,11 +136,12 @@ describe('server/api/zerion/positions.get', () => {
 
   it('should fetch positions from Zerion API', async () => {
     const { ZerionApiResponseSchema } = await import('../../../../../app/utils/zerion-schema')
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
-    
+
     const mockResponse = {
       data: [
         {
@@ -160,9 +168,11 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     // Use dependency injection - pass a function that returns our mock config
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: apiKey,
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: apiKey,
+      })
+    )
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
@@ -175,7 +185,7 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     const event = createEvent({})
-    
+
     // Call the handler function directly with dependency injection
     const result = await handlePositionsRequest(event, getConfig)
 
@@ -195,8 +205,9 @@ describe('server/api/zerion/positions.get', () => {
   })
 
   it('should handle 202 status (portfolio being prepared)', async () => {
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
 
@@ -205,9 +216,11 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     // Use dependency injection
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: apiKey,
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: apiKey,
+      })
+    )
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
@@ -215,7 +228,7 @@ describe('server/api/zerion/positions.get', () => {
     } as Response)
 
     const event = createEvent({})
-    
+
     // Call the handler function directly with dependency injection
     const result = await handlePositionsRequest(event, getConfig)
 
@@ -226,8 +239,9 @@ describe('server/api/zerion/positions.get', () => {
   })
 
   it('should handle API errors', async () => {
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
 
@@ -236,9 +250,11 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     // Use dependency injection
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: apiKey,
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: apiKey,
+      })
+    )
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
@@ -247,7 +263,7 @@ describe('server/api/zerion/positions.get', () => {
     } as Response)
 
     const event = createEvent({})
-    
+
     // Call the handler function directly with dependency injection
     await expect(handlePositionsRequest(event, getConfig)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
@@ -260,8 +276,9 @@ describe('server/api/zerion/positions.get', () => {
 
   it('should filter by chain IDs when provided', async () => {
     const { ZerionApiResponseSchema } = await import('../../../../../app/utils/zerion-schema')
-    const { handlePositionsRequest } = await import('../../../../../server/api/zerion/positions.get')
-    
+    const { handlePositionsRequest } =
+      await import('../../../../../server/api/zerion/positions.get')
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
 
@@ -276,9 +293,11 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     // Use dependency injection
-    const getConfig = vi.fn((): MockRuntimeConfig => ({
-      zerionApiKey: apiKey,
-    }))
+    const getConfig = vi.fn(
+      (): MockRuntimeConfig => ({
+        zerionApiKey: apiKey,
+      })
+    )
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
@@ -291,7 +310,7 @@ describe('server/api/zerion/positions.get', () => {
     })
 
     const event = createEvent({})
-    
+
     // Call the handler function directly with dependency injection
     await handlePositionsRequest(event, getConfig)
 
@@ -303,4 +322,3 @@ describe('server/api/zerion/positions.get', () => {
     expect(getConfig).toHaveBeenCalled()
   })
 })
-

@@ -5,30 +5,26 @@ import { config } from '~/chains-config'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
 const { isConnected } = useConnection({ config })
-const { watchedAddress, setWatchedAddress, clearWatchedAddress, isValidAddress } = useWatchedAddress()
+const { watchedAddress, setWatchedAddress, clearWatchedAddress, isValidAddress } =
+  useWatchedAddress()
 
 const addressInput = ref('')
 const addressError = ref('')
 
-// Show modal when wallet is not connected and no watched address
 const showModal = computed(() => !isConnected.value && !watchedAddress.value)
 
-// Watch for connection to close modal
-watch(isConnected, (connected) => {
+watch(isConnected, connected => {
   if (connected) {
-    // Clear watched address when wallet connects
     clearWatchedAddress()
   }
 })
 
-// Handle address input
 function handleAddressInput(value: string) {
   addressInput.value = value
   addressError.value = ''
-  
+
   const trimmed = value.trim()
-  
-  // Auto-watch if valid address
+
   if (trimmed && isValidAddress(trimmed)) {
     setWatchedAddress(trimmed.toLowerCase())
     addressInput.value = ''
@@ -38,32 +34,29 @@ function handleAddressInput(value: string) {
   }
 }
 
-// Submit watched address
 function handleWatchAddress() {
   const trimmed = addressInput.value.trim()
-  
+
   if (!trimmed) {
     addressError.value = 'Please enter an address'
     return
   }
-  
+
   if (!isValidAddress(trimmed)) {
     addressError.value = 'Invalid Ethereum address format'
     return
   }
-  
+
   setWatchedAddress(trimmed.toLowerCase())
   addressInput.value = ''
   addressError.value = ''
 }
 
-// Clear watched address
 function handleClearWatch() {
   clearWatchedAddress()
   addressInput.value = ''
   addressError.value = ''
 }
-
 </script>
 
 <template>
@@ -71,7 +64,6 @@ function handleClearWatch() {
     <Transition name="modal">
       <div v-if="showModal" class="modal-overlay" data-testid="modal-overlay">
         <div class="modal-content">
-
           <div class="modal-body">
             <!-- Connect Wallet Section -->
             <div class="connect-section">
@@ -88,8 +80,12 @@ function handleClearWatch() {
             <!-- Watch Address Section -->
             <div class="watch-section">
               <label class="input-label">Watch Address</label>
-              
-              <div v-if="watchedAddress" class="watched-address-display" data-testid="watched-address-display">
+
+              <div
+                v-if="watchedAddress"
+                class="watched-address-display"
+                data-testid="watched-address-display"
+              >
                 <div class="watched-info">
                   <span class="watched-label">Watching:</span>
                   <span class="watched-address font-mono">{{ watchedAddress }}</span>
@@ -111,7 +107,9 @@ function handleClearWatch() {
                   @blur="handleAddressInput(addressInput)"
                   @keyup.enter="() => handleWatchAddress()"
                 />
-                <p v-if="addressError" class="error-message" data-testid="address-error">{{ addressError }}</p>
+                <p v-if="addressError" class="error-message" data-testid="address-error">
+                  {{ addressError }}
+                </p>
               </div>
             </div>
           </div>
@@ -320,7 +318,6 @@ function handleClearWatch() {
   margin-top: -8px;
 }
 
-/* Modal transitions */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.3s ease;
@@ -328,7 +325,9 @@ function handleClearWatch() {
 
 .modal-enter-active .modal-content,
 .modal-leave-active .modal-content {
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .modal-enter-from,
@@ -342,7 +341,6 @@ function handleClearWatch() {
   opacity: 0;
 }
 
-/* Responsive */
 @media (max-width: 640px) {
   .modal-content {
     max-width: 100%;
@@ -356,4 +354,3 @@ function handleClearWatch() {
   }
 }
 </style>
-

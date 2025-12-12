@@ -6,7 +6,6 @@ import { config } from '~/chains-config'
 
 const { isConnected } = useConnection({ config })
 
-
 const buttonText = computed(() => {
   if (isConnected.value) return 'Wallet Menu'
   return 'Connect Wallet'
@@ -15,9 +14,8 @@ const buttonText = computed(() => {
 
 <template>
   <div class="connect-button-wrapper" data-testid="connect-button-wrapper">
-    <!-- Custom styled button -->
-    <button 
-      class="connect-button" 
+    <button
+      class="connect-button"
       :class="{ connected: isConnected }"
       data-testid="connect-button"
       @click="useAppKit().open()"
@@ -51,7 +49,6 @@ const buttonText = computed(() => {
 
 .connect-button:hover {
   background: var(--accent-hover);
-  /* transform: translateY(-1px); */
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
@@ -87,7 +84,8 @@ const buttonText = computed(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
-

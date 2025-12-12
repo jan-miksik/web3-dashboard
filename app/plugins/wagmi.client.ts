@@ -3,7 +3,7 @@ import { WagmiPlugin } from '@wagmi/vue'
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { config } from '~/chains-config'
 
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin(nuxtApp => {
   const queryClient = new QueryClient()
 
   nuxtApp.vueApp.use(WagmiPlugin, { config })

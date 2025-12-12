@@ -1,7 +1,7 @@
 import { http, createConfig } from '@wagmi/vue'
-import { 
-  mainnet, 
-  base, 
+import {
+  mainnet,
+  base,
   optimism,
   arbitrum,
   polygon,
@@ -13,21 +13,10 @@ import {
 } from '@wagmi/vue/chains'
 
 export const config = createConfig({
-  chains: [
-    mainnet, 
-    base, 
-    optimism,
-    arbitrum,
-    polygon,
-    avalanche,
-    celo,
-    fantom,
-    gnosis,
-    zkSync,
-  ],
-  
+  chains: [mainnet, base, optimism, arbitrum, polygon, avalanche, celo, fantom, gnosis, zkSync],
+
   transports: {
-    [mainnet.id]: http(), 
+    [mainnet.id]: http(),
     [base.id]: http(),
     [optimism.id]: http(),
     [arbitrum.id]: http(),

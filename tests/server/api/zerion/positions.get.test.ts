@@ -72,10 +72,10 @@ describe('server/api/zerion/positions.get', () => {
     } as any)
 
     const event = createEvent({} as any)
-    
+
     // Dynamically import the handler using relative path
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     await expect(handler.default(event)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -94,9 +94,9 @@ describe('server/api/zerion/positions.get', () => {
     } as any)
 
     const event = createEvent({} as any)
-    
+
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     await expect(handler.default(event)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -108,10 +108,10 @@ describe('server/api/zerion/positions.get', () => {
 
   it('should fetch positions from Zerion API', async () => {
     const { ZerionApiResponseSchema } = await import('../../../../app/utils/zerion-schema')
-    
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
-    
+
     const mockResponse = {
       data: [
         {
@@ -151,7 +151,7 @@ describe('server/api/zerion/positions.get', () => {
 
     const event = createEvent({} as any)
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     const result = await handler.default(event)
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ describe('server/api/zerion/positions.get', () => {
 
     const event = createEvent({} as any)
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     const result = await handler.default(event)
 
     expect(result.status).toBe(202)
@@ -213,7 +213,7 @@ describe('server/api/zerion/positions.get', () => {
 
     const event = createEvent({} as any)
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     await expect(handler.default(event)).rejects.toThrow()
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -224,7 +224,7 @@ describe('server/api/zerion/positions.get', () => {
 
   it('should filter by chain IDs when provided', async () => {
     const { ZerionApiResponseSchema } = await import('../../../../app/utils/zerion-schema')
-    
+
     const walletAddress = '0x1234567890123456789012345678901234567890'
     const apiKey = 'test-api-key'
 
@@ -253,7 +253,7 @@ describe('server/api/zerion/positions.get', () => {
 
     const event = createEvent({} as any)
     const handler = await import('../../../../server/api/zerion/positions.get')
-    
+
     await handler.default(event)
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -262,4 +262,3 @@ describe('server/api/zerion/positions.get', () => {
     )
   })
 })
-

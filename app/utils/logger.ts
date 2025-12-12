@@ -1,6 +1,6 @@
 /**
  * Centralized logging utility
- * 
+ *
  * Provides consistent logging across the application with:
  * - Log levels (debug, info, warn, error)
  * - Environment-aware logging (debug/info in dev only, warn/error in all environments)
@@ -24,7 +24,12 @@ interface Logger {
 class LoggerImpl implements Logger {
   private isProduction = !import.meta.dev
 
-  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | unknown): string {
+  private formatMessage(
+    level: LogLevel,
+    message: string,
+    context?: LogContext,
+    error?: Error | unknown
+  ): string {
     const timestamp = new Date().toISOString()
     const parts = [`[${timestamp}]`, `[${level.toUpperCase()}]`, message]
 
@@ -57,35 +62,35 @@ class LoggerImpl implements Logger {
 
   debug(message: string, context?: LogContext): void {
     if (!this.shouldLog('debug')) return
-    
+
     const formatted = this.formatMessage('debug', message, context)
-    // eslint-disable-next-line no-console
+
     console.debug(formatted)
   }
 
   info(message: string, context?: LogContext): void {
     if (!this.shouldLog('info')) return
-    
+
     const formatted = this.formatMessage('info', message, context)
-    // eslint-disable-next-line no-console
+
     console.info(formatted)
   }
 
   warn(message: string, context?: LogContext): void {
     if (!this.shouldLog('warn')) return
-    
+
     const formatted = this.formatMessage('warn', message, context)
-    // eslint-disable-next-line no-console
+
     console.warn(formatted)
   }
 
   error(message: string, error?: Error | unknown, context?: LogContext): void {
     if (!this.shouldLog('error')) return
-    
+
     const formatted = this.formatMessage('error', message, context, error)
-    // eslint-disable-next-line no-console
+
     console.error(formatted)
-    
+
     // In production, you might want to send errors to an error tracking service
     // Example: Sentry, LogRocket, etc.
     if (this.isProduction && error) {
@@ -97,4 +102,3 @@ class LoggerImpl implements Logger {
 
 // Export singleton instance
 export const logger = new LoggerImpl()
-

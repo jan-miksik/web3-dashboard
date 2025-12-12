@@ -170,5 +170,3 @@ describe('TokenList', () => {
     expect(wrapper.find('[data-testid="refresh-btn"]').attributes('disabled')).toBeDefined()
   })
 })
-
-

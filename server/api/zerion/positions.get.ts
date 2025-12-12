@@ -2,12 +2,12 @@ import type { ZerionApiResponse, ZerionPosition, ZerionIncludedItem } from '~/ty
 import { CHAIN_ID_TO_ZERION } from '~/utils/chains'
 import { ZerionApiResponseSchema } from '~/utils/zerion-schema'
 
-// Zerion API base URL
+import type { H3Event } from 'h3'
+
 const ZERION_API_BASE = 'https://api.zerion.io/v1'
 
-// Create HTTP Basic Auth header
+// HTTP Basic Auth: base64(apiKey:)
 function getAuthHeader(apiKey: string): string {
-  // HTTP Basic Auth: base64(apiKey:)
   const credentials = Buffer.from(`${apiKey}:`).toString('base64')
   return `Basic ${credentials}`
 }
@@ -20,8 +20,6 @@ function getRuntimeConfig() {
 export default defineEventHandler(async (event): Promise<ZerionApiResponse> => {
   return handlePositionsRequest(event, getRuntimeConfig)
 })
-
-import type { H3Event } from 'h3'
 
 export async function handlePositionsRequest(
   event: H3Event,
@@ -47,42 +45,35 @@ export async function handlePositionsRequest(
     })
   }
 
-  // Get supported chain IDs from query or use default
-  const chainIds = query.chainIds 
+  const chainIds = query.chainIds
     ? (Array.isArray(query.chainIds) ? query.chainIds : [query.chainIds]).map(String)
     : Object.keys(CHAIN_ID_TO_ZERION).map(String)
 
-  // Convert numeric chain IDs to Zerion chain IDs
   const zerionChainIds = chainIds
     .map(id => CHAIN_ID_TO_ZERION[Number(id)])
     .filter(Boolean) as string[]
 
-  // Zerion API endpoint for wallet positions
   const apiUrl = `${ZERION_API_BASE}/wallets/${walletAddress}/positions/`
 
-  // Build base query parameters
   const baseParams = new URLSearchParams()
-  
-  // Add chain filter if we have supported chains
+
   if (zerionChainIds.length > 0) {
     zerionChainIds.forEach(chainId => {
       baseParams.append('filter[chain_ids]', chainId)
     })
   }
-  
+
   // Filter for fungible assets only (tokens, not NFTs or protocol positions)
   baseParams.append('filter[asset_types]', 'fungible')
-  
-  // Pagination - set page size
+
   baseParams.append('page[size]', '100')
 
-  // Helper function to fetch a single page
   async function fetchPage(url: string): Promise<ZerionApiResponse> {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Authorization': getAuthHeader(apiKey),
-        'Accept': 'application/json',
+        Authorization: getAuthHeader(apiKey),
+        Accept: 'application/json',
       },
     })
 
@@ -95,7 +86,7 @@ export async function handlePositionsRequest(
           message: 'Portfolio is being prepared',
         }
       }
-      
+
       const errorText = await response.text()
       throw createError({
         statusCode: response.status,
@@ -103,11 +94,10 @@ export async function handlePositionsRequest(
       })
     }
 
-    // Parse JSON response
     let jsonData: unknown
     try {
       jsonData = await response.json()
-    } catch (parseError) {
+    } catch (_parseError) {
       throw createError({
         statusCode: 502,
         statusMessage: 'Failed to parse Zerion API response as JSON',
@@ -116,10 +106,10 @@ export async function handlePositionsRequest(
 
     // Validate response structure with Zod
     const validationResult = ZerionApiResponseSchema.safeParse(jsonData)
-    
+
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues
-        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .map(err => `${err.path.join('.')}: ${err.message}`)
         .join('; ')
       throw createError({
         statusCode: 502,
@@ -131,7 +121,6 @@ export async function handlePositionsRequest(
   }
 
   try {
-    // Aggregate all pages
     const allData: ZerionPosition[] = []
     const allIncluded: ZerionIncludedItem[] = []
     let nextPageUrl: string | null = null
@@ -140,10 +129,8 @@ export async function handlePositionsRequest(
     const maxPages = 100 // Safety limit to prevent infinite loops
 
     do {
-      // Fetch current page
       const pageResponse = await fetchPage(currentUrl)
-      
-      // Handle 202 status (portfolio being prepared)
+
       if (pageResponse.status === 202) {
         return {
           data: [],
@@ -152,7 +139,6 @@ export async function handlePositionsRequest(
         }
       }
 
-      // Aggregate data and included items
       if (pageResponse.data) {
         allData.push(...pageResponse.data)
       }
@@ -160,27 +146,24 @@ export async function handlePositionsRequest(
         allIncluded.push(...pageResponse.included)
       }
 
-      // Check for next page
       nextPageUrl = pageResponse.links?.next || null
       if (nextPageUrl) {
         currentUrl = nextPageUrl
         pageCount++
-        
+
         // Safety check to prevent infinite loops
         if (pageCount >= maxPages) {
           // Note: Using console.warn for server-side logging in this API route
-          // eslint-disable-next-line no-console
+
           console.warn(`Reached maximum page limit (${maxPages}) for wallet ${walletAddress}`)
           break
         }
 
         // Small delay between requests to respect rate limits
-        // Wait 100ms between paginated requests
         await new Promise(resolve => setTimeout(resolve, 100))
       }
     } while (nextPageUrl)
 
-    // Return aggregated response
     return {
       data: allData,
       included: allIncluded,
@@ -199,4 +182,3 @@ export async function handlePositionsRequest(
     })
   }
 }
-

@@ -10,7 +10,7 @@ if (typeof window !== 'undefined') {
     length: 0,
     key: vi.fn(),
   }
-  
+
   Object.defineProperty(window, 'localStorage', {
     value: localStorageMock,
     writable: true,
@@ -19,4 +19,3 @@ if (typeof window !== 'undefined') {
 
 // Mock fetch globally
 global.fetch = vi.fn()
-

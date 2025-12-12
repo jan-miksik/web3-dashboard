@@ -6,15 +6,12 @@ import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
 import { handleError } from '~/utils/error-handler'
 
-// Get available chains from tokens
 const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
   return CHAIN_METADATA.filter(chain => chainIds.has(chain.id))
 }
 
-const { tokens, isLoading, error, refetch, isConnected, totalUsdValue } = useTokens()
+const { tokens, isLoading, error, refetch, isConnected } = useTokens()
 const { watchedAddress } = useWatchedAddress()
-
-
 const hasAddress = computed(() => isConnected.value || !!watchedAddress.value)
 const showLowValueAssets = ref(false)
 const selectedChainIds = ref<Set<number>>(new Set()) // Empty set = all chains
@@ -33,13 +30,11 @@ async function copyTokenAddress(address: string) {
   try {
     await navigator.clipboard.writeText(address)
     copiedAddress.value = address
-    
-    // Clear any existing timeout
+
     if (copyTimeout) {
       clearTimeout(copyTimeout)
     }
-    
-    // Reset after 2 seconds
+
     copyTimeout = setTimeout(() => {
       copiedAddress.value = null
     }, 2000)
@@ -56,49 +51,40 @@ async function handleRefresh() {
   isRefreshing.value = true
   try {
     await refetch()
-    // Add a small delay to show the animation
     await new Promise(resolve => setTimeout(resolve, 500))
   } finally {
     isRefreshing.value = false
   }
 }
 
-// Get available chains from tokens
 const availableChains = computed(() => {
   const chainIds = new Set(tokens.value.map(t => t.chainId))
   return getAvailableChains(chainIds)
 })
 
-// Separate tokens into high-value and low-value
 const highValueTokens = computed(() => {
   let result = tokens.value
 
-  // Filter by chain (if any chains selected, show only those; empty set = all)
   if (selectedChainIds.value.size > 0) {
     result = result.filter(token => selectedChainIds.value.has(token.chainId))
   }
 
-  // Only high-value tokens (>= $5)
   return result.filter(token => token.usdValue >= 5)
 })
 
 const lowValueTokens = computed(() => {
   let result = tokens.value
 
-  // Filter by chain (if any chains selected, show only those; empty set = all)
   if (selectedChainIds.value.size > 0) {
     result = result.filter(token => selectedChainIds.value.has(token.chainId))
   }
 
-  // Only low-value tokens (< $5)
   return result.filter(token => token.usdValue > 0 && token.usdValue < 5)
 })
 
 const filteredTokens = computed(() => {
-  // Always show high-value tokens
   const result = [...highValueTokens.value]
-  
-  // Add low-value tokens if enabled
+
   if (showLowValueAssets.value) {
     result.push(...lowValueTokens.value)
   }
@@ -106,33 +92,35 @@ const filteredTokens = computed(() => {
   return result
 })
 
-// Calculate total value for filtered tokens
 const filteredTotalUsdValue = computed(() => {
   return filteredTokens.value.reduce((sum, token) => sum + token.usdValue, 0)
 })
 
-// Check if there are low-value assets
 const hasLowValueAssets = computed(() => {
   return lowValueTokens.value.length > 0
 })
 
 // Auto-show low-value assets if high-value tokens are empty (button would not be visible)
-// This ensures assets below $5 are shown when there are no high-value tokens
-watch([tokens, selectedChainIds], () => {
-  const hasHighValue = tokens.value.some(token => {
-    const matchesChain = selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
-    return matchesChain && token.usdValue >= 5
-  })
-  const hasLowValue = tokens.value.some(token => {
-    const matchesChain = selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
-    return matchesChain && token.usdValue > 0 && token.usdValue < 5
-  })
-  
-  // If no high-value tokens but there are low-value tokens, auto-show them
-  if (!hasHighValue && hasLowValue && !showLowValueAssets.value) {
-    showLowValueAssets.value = true
-  }
-}, { immediate: true, deep: true })
+watch(
+  [tokens, selectedChainIds],
+  () => {
+    const hasHighValue = tokens.value.some(token => {
+      const matchesChain =
+        selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
+      return matchesChain && token.usdValue >= 5
+    })
+    const hasLowValue = tokens.value.some(token => {
+      const matchesChain =
+        selectedChainIds.value.size === 0 || selectedChainIds.value.has(token.chainId)
+      return matchesChain && token.usdValue > 0 && token.usdValue < 5
+    })
+
+    if (!hasHighValue && hasLowValue && !showLowValueAssets.value) {
+      showLowValueAssets.value = true
+    }
+  },
+  { immediate: true, deep: true }
+)
 
 const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 0) {
@@ -154,7 +142,6 @@ function toggleChain(chainId: number) {
   } else {
     selectedChainIds.value.add(chainId)
   }
-  // Create new Set to trigger reactivity
   selectedChainIds.value = new Set(selectedChainIds.value)
 }
 
@@ -166,7 +153,6 @@ function getChainInfo(chainId: number): ChainMetadata | undefined {
   return getChainMetadata(chainId)
 }
 
-// Close filter when clicking outside
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
   if (chainFilterRef.value && !chainFilterRef.value.contains(target)) {
@@ -211,6 +197,11 @@ function formatTotalValue(value: number): string {
     maximumFractionDigits: 2,
   })
 }
+
+function handleClickAllNetworks() {
+  selectedChainIds.value = new Set()
+  showChainFilter.value = false
+}
 </script>
 
 <template>
@@ -223,9 +214,12 @@ function formatTotalValue(value: number): string {
         </span>
       </div>
       <div class="header-actions">
-        <!-- Network Filter -->
-        <div v-if="hasAddress && availableChains.length > 0" class="network-filter-container" ref="chainFilterRef">
-          <button 
+        <div
+          v-if="hasAddress && availableChains.length > 0"
+          ref="chainFilterRef"
+          class="network-filter-container"
+        >
+          <button
             class="network-filter-btn"
             data-testid="network-filter-btn"
             :class="{ active: selectedChainIds.size > 0 }"
@@ -235,14 +229,18 @@ function formatTotalValue(value: number): string {
             <span class="filter-arrow" :class="{ rotated: showChainFilter }">▼</span>
           </button>
           <Transition name="dropdown">
-            <div v-if="showChainFilter" class="network-filter-dropdown" data-testid="network-filter-dropdown">
+            <div
+              v-if="showChainFilter"
+              class="network-filter-dropdown"
+              data-testid="network-filter-dropdown"
+            >
               <button
                 class="filter-option"
                 :class="{ selected: selectedChainIds.size === 0 }"
-                @click="selectedChainIds = new Set(); showChainFilter = false"
+                @click="handleClickAllNetworks"
               >
                 <span class="option-name">All Networks</span>
-                <span class="checkmark" v-if="selectedChainIds.size === 0">✓</span>
+                <span v-if="selectedChainIds.size === 0" class="checkmark">✓</span>
               </button>
               <button
                 v-for="chain in availableChains"
@@ -253,36 +251,55 @@ function formatTotalValue(value: number): string {
                 @click="toggleChain(chain.id)"
               >
                 <div class="option-left">
-                  <img 
-                    v-if="chain.icon" 
-                    :src="chain.icon" 
+                  <img
+                    v-if="chain.icon"
+                    :src="chain.icon"
                     :alt="chain.name"
                     class="chain-icon"
-                    @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-                  >
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                  />
                   <span class="option-name">{{ chain.name }}</span>
                 </div>
                 <div class="option-right">
                   <span class="chain-type" :class="chain.type.toLowerCase()">
                     {{ chain.type }}
                   </span>
-                  <span class="checkmark" v-if="isChainSelected(chain.id)">✓</span>
+                  <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
                 </div>
               </button>
             </div>
           </Transition>
         </div>
-        <button 
-          v-if="hasAddress" 
-          class="refresh-btn" 
+        <button
+          v-if="hasAddress"
+          class="refresh-btn"
           data-testid="refresh-btn"
           :disabled="isLoading || isRefreshing"
           title="Refresh balances"
           @click="handleRefresh"
         >
-          <svg class="refresh-icon" :class="{ spinning: isLoading || isRefreshing }" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M13.5 2.5L12.5 5.5L9.5 4.5M2.5 13.5L3.5 10.5L6.5 11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2.5 8C2.5 11.0376 4.96243 13.5 8 13.5C9.38959 13.5 10.6548 12.9775 11.6304 12.1047M13.5 8C13.5 4.96243 11.0376 2.5 8 2.5C6.61041 2.5 5.34518 3.02247 4.36964 3.89534" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <svg
+            class="refresh-icon"
+            :class="{ spinning: isLoading || isRefreshing }"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M13.5 2.5L12.5 5.5L9.5 4.5M2.5 13.5L3.5 10.5L6.5 11.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M2.5 8C2.5 11.0376 4.96243 13.5 8 13.5C9.38959 13.5 10.6548 12.9775 11.6304 12.1047M13.5 8C13.5 4.96243 11.0376 2.5 8 2.5C6.61041 2.5 5.34518 3.02247 4.36964 3.89534"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
           </svg>
         </button>
       </div>
@@ -301,7 +318,11 @@ function formatTotalValue(value: number): string {
     </div>
 
     <!-- Loading State -->
-    <div v-else-if="isLoading && tokens.length === 0" class="loading-state" data-testid="loading-state">
+    <div
+      v-else-if="isLoading && tokens.length === 0"
+      class="loading-state"
+      data-testid="loading-state"
+    >
       <div class="skeleton-table">
         <div v-for="i in 5" :key="i" class="skeleton-row">
           <div class="skeleton skeleton-token"></div>
@@ -313,35 +334,50 @@ function formatTotalValue(value: number): string {
     <!-- Empty Tokens State -->
     <div v-else-if="filteredTokens.length === 0" class="empty-state" data-testid="empty-state">
       <div class="empty-icon">📭</div>
-      <p v-if="!showLowValueAssets && tokens.length > 0">
-        No tokens with value ≥ $5.
-      </p>
+      <p v-if="!showLowValueAssets && tokens.length > 0">No tokens with value ≥ $5.</p>
       <p v-else-if="selectedChainIds.size > 0">No tokens found for selected networks</p>
       <p v-else>No tokens found across networks</p>
     </div>
 
     <!-- Token Table -->
-    <div v-else class="table-container" :class="{ refreshing: isRefreshing }" data-testid="token-table-container">
-      <table class="token-table" :class="{ loading: isLoading || isRefreshing }" data-testid="token-table">
+    <div
+      v-else
+      class="table-container"
+      :class="{ refreshing: isRefreshing }"
+      data-testid="token-table-container"
+    >
+      <table
+        class="token-table"
+        :class="{ loading: isLoading || isRefreshing }"
+        data-testid="token-table"
+      >
         <tbody>
           <!-- High-value tokens (>= $5) -->
-          <tr v-for="token in highValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row" data-testid="token-row">
+          <tr
+            v-for="token in highValueTokens"
+            :key="`${token.chainId}-${token.address}`"
+            class="token-row"
+            data-testid="token-row"
+          >
             <td class="td-token">
               <div class="token-info">
                 <div class="token-logo">
-                  <img 
-                    v-if="token.logoURI" 
-                    :src="token.logoURI" 
+                  <img
+                    v-if="token.logoURI"
+                    :src="token.logoURI"
                     :alt="token.symbol"
-                    @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-                  >
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                  />
                   <span v-else class="token-placeholder">{{ token.symbol.charAt(0) }}</span>
                 </div>
                 <div class="token-details">
                   <div class="token-symbol-row">
                     <span class="token-symbol">{{ token.symbol }}</span>
-                    <button 
-                      v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
+                    <button
+                      v-if="
+                        token.address &&
+                        token.address !== '0x0000000000000000000000000000000000000000'
+                      "
                       class="token-address-btn"
                       data-testid="copy-token-address-btn"
                       :class="{ copied: copiedAddress === token.address }"
@@ -349,25 +385,65 @@ function formatTotalValue(value: number): string {
                       @click="copyTokenAddress(token.address)"
                     >
                       <span class="token-address">{{ shortenAddress(token.address) }}</span>
-                      <svg v-if="copiedAddress === token.address" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <svg
+                        v-if="copiedAddress === token.address"
+                        class="copy-icon"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M3 8L6.5 11.5L13 5"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
                       </svg>
-                      <svg v-else class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
-                        <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
+                      <svg
+                        v-else
+                        class="copy-icon"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect
+                          x="6"
+                          y="6"
+                          width="8"
+                          height="8"
+                          stroke="currentColor"
+                          stroke-width="1.25"
+                          fill="none"
+                        />
+                        <rect
+                          x="2"
+                          y="2"
+                          width="8"
+                          height="8"
+                          stroke="currentColor"
+                          stroke-width="1.25"
+                          fill="none"
+                        />
                       </svg>
                     </button>
                   </div>
                   <span class="token-meta">
                     <span class="token-name">{{ token.name }}</span>
                     <span class="chain-badge-wrapper">
-                      <img 
-                        v-if="getChainIcon(token.chainId)" 
-                        :src="getChainIcon(token.chainId)" 
+                      <img
+                        v-if="getChainIcon(token.chainId)"
+                        :src="getChainIcon(token.chainId)"
                         :alt="token.chainName"
                         class="chain-badge-icon"
-                        @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-                      >
+                        @error="
+                          (e: Event) => ((e.target as HTMLImageElement).style.display = 'none')
+                        "
+                      />
                       <span class="chain-badge">{{ token.chainName }}</span>
                     </span>
                   </span>
@@ -387,8 +463,12 @@ function formatTotalValue(value: number): string {
           <!-- Divider row with button (only if there are low-value assets) -->
           <tr v-if="hasLowValueAssets && !showLowValueAssets" class="divider-row">
             <td colspan="2" class="divider-cell">
-              <button class="show-low-value-btn" data-testid="show-low-value-btn" @click="showLowValueAssets = true">
-                Show assets < $5
+              <button
+                class="show-low-value-btn"
+                data-testid="show-low-value-btn"
+                @click="showLowValueAssets = true"
+              >
+                {{ 'Show assets < $5' }}
               </button>
             </td>
           </tr>
@@ -397,57 +477,111 @@ function formatTotalValue(value: number): string {
           <template v-if="showLowValueAssets">
             <tr class="divider-row">
               <td colspan="2" class="divider-cell">
-                <button class="hide-low-value-btn" data-testid="hide-low-value-btn" @click="showLowValueAssets = false">
-                  Hide assets < $5
+                <button
+                  class="hide-low-value-btn"
+                  data-testid="hide-low-value-btn"
+                  @click="showLowValueAssets = false"
+                >
+                  Hide assets &lt; $5
                 </button>
               </td>
             </tr>
-            <tr v-for="token in lowValueTokens" :key="`${token.chainId}-${token.address}`" class="token-row" data-testid="token-row">
+            <tr
+              v-for="token in lowValueTokens"
+              :key="`${token.chainId}-${token.address}`"
+              class="token-row"
+              data-testid="token-row"
+            >
               <td class="td-token">
                 <div class="token-info">
                   <div class="token-logo">
-                    <img 
-                      v-if="token.logoURI" 
-                      :src="token.logoURI" 
+                    <img
+                      v-if="token.logoURI"
+                      :src="token.logoURI"
                       :alt="token.symbol"
-                      @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-                    >
+                      @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                    />
                     <span v-else class="token-placeholder">{{ token.symbol.charAt(0) }}</span>
                   </div>
-                <div class="token-details">
-                  <div class="token-symbol-row">
-                    <span class="token-symbol">{{ token.symbol }}</span>
-                    <button 
-                      v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
-                      class="token-address-btn"
-                      :class="{ copied: copiedAddress === token.address }"
-                      :title="copiedAddress === token.address ? 'Copied!' : 'Copy contract address'"
-                      @click="copyTokenAddress(token.address)"
-                    >
-                      <span class="token-address">{{ shortenAddress(token.address) }}</span>
-                      <svg v-if="copiedAddress === token.address" class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                      </svg>
-                      <svg v-else class="copy-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="6" y="6" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
-                        <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.25" fill="none"/>
-                      </svg>
-                    </button>
-                  </div>
-                  <span class="token-meta">
-                    <span class="token-name">{{ token.name }}</span>
-                    <span class="chain-badge-wrapper">
-                      <img 
-                        v-if="getChainIcon(token.chainId)" 
-                        :src="getChainIcon(token.chainId)" 
-                        :alt="token.chainName"
-                        class="chain-badge-icon"
-                        @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  <div class="token-details">
+                    <div class="token-symbol-row">
+                      <span class="token-symbol">{{ token.symbol }}</span>
+                      <button
+                        v-if="
+                          token.address &&
+                          token.address !== '0x0000000000000000000000000000000000000000'
+                        "
+                        class="token-address-btn"
+                        :class="{ copied: copiedAddress === token.address }"
+                        :title="
+                          copiedAddress === token.address ? 'Copied!' : 'Copy contract address'
+                        "
+                        @click="copyTokenAddress(token.address)"
                       >
-                      <span class="chain-badge">{{ token.chainName }}</span>
+                        <span class="token-address">{{ shortenAddress(token.address) }}</span>
+                        <svg
+                          v-if="copiedAddress === token.address"
+                          class="copy-icon"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M3 8L6.5 11.5L13 5"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                        <svg
+                          v-else
+                          class="copy-icon"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <rect
+                            x="6"
+                            y="6"
+                            width="8"
+                            height="8"
+                            stroke="currentColor"
+                            stroke-width="1.25"
+                            fill="none"
+                          />
+                          <rect
+                            x="2"
+                            y="2"
+                            width="8"
+                            height="8"
+                            stroke="currentColor"
+                            stroke-width="1.25"
+                            fill="none"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <span class="token-meta">
+                      <span class="token-name">{{ token.name }}</span>
+                      <span class="chain-badge-wrapper">
+                        <img
+                          v-if="getChainIcon(token.chainId)"
+                          :src="getChainIcon(token.chainId)"
+                          :alt="token.chainName"
+                          class="chain-badge-icon"
+                          @error="
+                            (e: Event) => ((e.target as HTMLImageElement).style.display = 'none')
+                          "
+                        />
+                        <span class="chain-badge">{{ token.chainName }}</span>
+                      </span>
                     </span>
-                  </span>
-                </div>
+                  </div>
                 </div>
               </td>
               <td class="td-value">
@@ -541,8 +675,12 @@ function formatTotalValue(value: number): string {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty States */
@@ -602,7 +740,12 @@ function formatTotalValue(value: number): string {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-tertiary) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
@@ -624,8 +767,12 @@ function formatTotalValue(value: number): string {
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Network Filter */
@@ -784,7 +931,9 @@ function formatTotalValue(value: number): string {
 /* Dropdown transitions */
 .dropdown-enter-active,
 .dropdown-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .dropdown-enter-from,
@@ -1068,6 +1217,5 @@ function formatTotalValue(value: number): string {
   .total-value {
     font-size: 14px;
   }
-
 }
 </style>

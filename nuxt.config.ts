@@ -16,7 +16,10 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap',
+        },
       ],
     },
   },
@@ -31,7 +34,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-side only (not exposed to client)
     zerionApiKey: process.env.NUXT_ZERION_API_KEY || '',
-    
+
     // Public (exposed to client)
     public: {
       reownProjectId: process.env.NUXT_REOWN_PROJECT_ID || '',
@@ -47,7 +50,7 @@ export default defineNuxtConfig({
     vue: {
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => tag.startsWith('appkit-'),
+          isCustomElement: tag => tag.startsWith('appkit-'),
         },
       },
     },

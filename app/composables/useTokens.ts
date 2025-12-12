@@ -14,7 +14,6 @@ import type {
   ZerionImplementation,
 } from '~/types/zerion'
 
-// Token type definition
 export interface Token {
   symbol: string
   name: string
@@ -30,17 +29,13 @@ export interface Token {
   tokenType: 'native' | 'erc20'
 }
 
-// Fetch function for TanStack Query
-// Now calls our server API endpoint which securely handles the Zerion API key
 async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
-  // Get supported chain IDs from our config
   const supportedChainIds = config.chains.map(chain => chain.id)
 
-  // Build query parameters for our server API
   const params = new URLSearchParams({
     address: walletAddress,
   })
-  
+
   // Add chain IDs as query parameters
   supportedChainIds.forEach(chainId => {
     params.append('chainIds', String(chainId))
@@ -51,7 +46,6 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
     method: 'GET',
   })
 
-  // Handle 202 status (portfolio being prepared)
   if (response.status === 202) {
     return []
   }
@@ -64,16 +58,13 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
     keys: Object.keys(data),
   })
 
-  // Handle Zerion API response structure
-  // Response format: { data: [...], included: [...] }
-  // Check multiple possible response structures
+  // Handle Zerion API response structure: { data: [...], included: [...] }
   let positions: ZerionPosition[] = []
-  
-  // Try standard JSON:API format
+
   if (Array.isArray(data.data)) {
     positions = data.data
   }
-  
+
   if (!Array.isArray(positions) || positions.length === 0) {
     logger.debug('Zerion API: No positions found in response', { data })
     return []
@@ -84,10 +75,8 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
     samplePosition: positions.length > 0 ? positions[0] : undefined,
   })
 
-  // Cache included array for lookups
   const included: ZerionIncludedItem[] = Array.isArray(data.included) ? data.included : []
 
-  // Transform Zerion response to our Token format
   const fetchedTokens: Token[] = positions
     .map((position: ZerionPosition): Token | null => {
       try {
@@ -95,100 +84,102 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
         const quantity = attributes.quantity || {}
         const price = attributes.price
         const value = attributes.value
-        
-        // Get chain ID from relationships (JSON:API format: relationships.chain.data.id)
+
+        // JSON:API format: relationships.chain.data.id
         const chainId = position.relationships?.chain?.data?.id
         if (!chainId) {
           logger.warn('Zerion API: Position missing chain ID', { position })
           return null
         }
-        
+
         const numericChainId = ZERION_TO_CHAIN_ID[chainId]
         if (!numericChainId) {
           logger.warn('Zerion API: Unknown chain ID', { chainId })
           return null
         }
-        
-        // Get fungible info from relationships or attributes
+
         // Fungible info might be in relationships.fungible.data or included array
         let fungibleInfo: ZerionFungibleInfo = attributes.fungible_info || {}
-        
-        // If fungible is in relationships, we might need to look it up from included array
+
         const fungibleRelationship = position.relationships?.fungible
         if (fungibleRelationship?.data) {
-          // Try to find fungible info from included array if available
-          const fungibleData = included.find((item: ZerionIncludedItem) => 
-            item.type === 'fungibles' && 
-            item.id === fungibleRelationship.data?.id
+          const fungibleData = included.find(
+            (item: ZerionIncludedItem) =>
+              item.type === 'fungibles' && item.id === fungibleRelationship.data?.id
           )
           if (fungibleData?.attributes && 'symbol' in fungibleData.attributes) {
             fungibleInfo = fungibleData.attributes as ZerionFungibleInfo
           }
         }
-        
-        // Extract token information
+
         const symbol = fungibleInfo.symbol || attributes.name || 'UNKNOWN'
         const name = fungibleInfo.name || attributes.name || symbol
         const decimals = quantity.decimals ?? fungibleInfo.decimals ?? 18
-        
-        // Handle different quantity formats
+
         let balanceFloat = 0
         let balanceInt = '0'
-        
+
         if (quantity.float !== undefined && quantity.float !== null) {
           balanceFloat = quantity.float
         } else if (quantity.numeric !== undefined && quantity.numeric !== null) {
           const parsed = parseFloat(quantity.numeric)
           balanceFloat = Number.isNaN(parsed) ? 0 : parsed
         }
-        
+
         if (quantity.int !== undefined && quantity.int !== null) {
           balanceInt = quantity.int
         } else if (quantity.numeric !== undefined && quantity.numeric !== null) {
           balanceInt = quantity.numeric
         }
-        
-        // Handle price and value
+
         // Price and value can be direct numbers or objects with float property
         let usdPrice = 0
         if (typeof price === 'number') {
           usdPrice = price
-        } else if (price && typeof price === 'object' && 'float' in price && price.float !== undefined && price.float !== null) {
+        } else if (
+          price &&
+          typeof price === 'object' &&
+          'float' in price &&
+          price.float !== undefined &&
+          price.float !== null
+        ) {
           usdPrice = price.float
         }
-        
+
         let usdValue = 0
         if (typeof value === 'number') {
           usdValue = value
-        } else if (value && typeof value === 'object' && 'float' in value && value.float !== undefined && value.float !== null) {
+        } else if (
+          value &&
+          typeof value === 'object' &&
+          'float' in value &&
+          value.float !== undefined &&
+          value.float !== null
+        ) {
           usdValue = value.float
         } else {
-          // Fallback: calculate from balance and price
           usdValue = balanceFloat * usdPrice
         }
-        
-        // Filter out positions with zero or very small balances
+
         if (balanceFloat <= 0.000001) {
           return null
         }
-        
-        // Get token address from implementations or fungible relationship
+
         // Zerion stores token implementations with chain_id and address
         let address = ''
-        
-        // Try to get address from implementations
+
         const implementations: ZerionImplementation[] = fungibleInfo.implementations || []
-        const implementation = implementations.find((impl: ZerionImplementation) => impl.chain_id === chainId)
+        const implementation = implementations.find(
+          (impl: ZerionImplementation) => impl.chain_id === chainId
+        )
         if (implementation) {
-          // Address can be null for native tokens
           address = implementation.address || ''
         }
-        
-        // If not found, try to extract from fungible relationship
+
         if (!address && fungibleRelationship?.data) {
-          const fungibleData = included.find((item: ZerionIncludedItem) => 
-            item.type === 'fungibles' && 
-            item.id === fungibleRelationship.data?.id
+          const fungibleData = included.find(
+            (item: ZerionIncludedItem) =>
+              item.type === 'fungibles' && item.id === fungibleRelationship.data?.id
           )
           if (fungibleData?.attributes && 'implementations' in fungibleData.attributes) {
             const impls = fungibleData.attributes.implementations as ZerionImplementation[]
@@ -200,27 +191,25 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
             }
           }
         }
-        
-        // Check if it's a native token
+
         // Native tokens have address: null in implementations (like ETH, MATIC, etc.)
-        const isNative = !address || 
-                        address === '0x0000000000000000000000000000000000000000' || 
-                        implementation?.address === null ||
-                        fungibleInfo.flags?.is_native === true ||
-                        // Native tokens often have position IDs like "base-ethereum-asset-asset" or "base-base-asset-asset"
-                        (position.id?.includes('-asset-asset') && !position.id?.match(/^0x[a-fA-F0-9]{40}/))
-        
-        // Set default address for native tokens
+        // Native tokens often have position IDs like "base-ethereum-asset-asset" or "base-base-asset-asset"
+        const isNative =
+          !address ||
+          address === '0x0000000000000000000000000000000000000000' ||
+          implementation?.address === null ||
+          fungibleInfo.flags?.is_native === true ||
+          (position.id?.includes('-asset-asset') && !position.id?.match(/^0x[a-fA-F0-9]{40}/))
+
         if (isNative && !address) {
           address = '0x0000000000000000000000000000000000000000'
         }
-        
-        // Get logo URL from icon (check both fungibleInfo and included fungible data)
+
         let logoURI: string | undefined = fungibleInfo.icon?.url
         if (!logoURI && fungibleRelationship?.data) {
-          const fungibleData = included.find((item: ZerionIncludedItem) => 
-            item.type === 'fungibles' && 
-            item.id === fungibleRelationship.data?.id
+          const fungibleData = included.find(
+            (item: ZerionIncludedItem) =>
+              item.type === 'fungibles' && item.id === fungibleRelationship.data?.id
           )
           if (fungibleData?.attributes && 'icon' in fungibleData.attributes) {
             const icon = fungibleData.attributes.icon as { url?: string }
@@ -241,8 +230,8 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
             maximumFractionDigits: 6,
           }),
           logoURI,
-        chainId: numericChainId,
-        chainName: getChainName(numericChainId),
+          chainId: numericChainId,
+          chainName: getChainName(numericChainId),
           usdPrice,
           usdValue,
           tokenType: isNative ? 'native' : 'erc20',
@@ -266,16 +255,14 @@ export function useTokens() {
   const { address, isConnected } = useConnection({ config })
   const currentChainId = useChainId({ config })
   const { watchedAddress } = useWatchedAddress()
-  
-  // Use watched address if available, otherwise use connected wallet address
+
   const effectiveAddress = computed(() => {
     if (isConnected.value && address.value) {
       return address.value
     }
     return watchedAddress.value
   })
-  
-  // Use TanStack Query for fetching and caching
+
   const {
     data: tokensData,
     isLoading,
@@ -289,7 +276,7 @@ export function useTokens() {
         handleError(error, {
           message: 'Wallet address is required to fetch token balances',
           context: { effectiveAddress: effectiveAddress.value },
-          showNotification: false, // Don't show notification for query errors
+          showNotification: false,
         })
         throw error
       }
@@ -309,27 +296,22 @@ export function useTokens() {
     return getChainName(currentChainId.value)
   })
 
-  // Sorted tokens by USD value (descending), with connected chain tokens first for same value
   const sortedTokens = computed(() => {
     const connectedChain = currentChainId.value
     return [...tokens.value].sort((a, b) => {
-      // First sort by USD value (descending)
       if (b.usdValue !== a.usdValue) {
         return b.usdValue - a.usdValue
       }
-      // If same value, prioritize connected chain
       if (a.chainId === connectedChain && b.chainId !== connectedChain) return -1
       if (b.chainId === connectedChain && a.chainId !== connectedChain) return 1
       return 0
     })
   })
 
-  // Total portfolio value
   const totalUsdValue = computed(() => {
     return tokens.value.reduce((sum: number, token: Token) => sum + token.usdValue, 0)
   })
 
-  // Tokens grouped by chain
   const tokensByChain = computed(() => {
     const grouped: Record<number, Token[]> = {}
     for (const token of tokens.value) {
@@ -341,7 +323,6 @@ export function useTokens() {
     return grouped
   })
 
-  // Transform query error to string
   const error = computed(() => {
     if (!queryError.value) return null
     if (queryError.value instanceof Error) {

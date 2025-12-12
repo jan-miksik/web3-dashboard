@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, computed } from 'vue'
-import { useTokens, type Token } from '../../../app/composables/useTokens'
+import { useTokens } from '../../../app/composables/useTokens'
 import { useQuery } from '@tanstack/vue-query'
 import { useConnection } from '@wagmi/vue'
 import { useWatchedAddress } from '../../../app/composables/useWatchedAddress'
@@ -144,7 +144,7 @@ describe('useTokens', () => {
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useQuery>)
 
-    const result = useTokens()
+    useTokens()
 
     expect(useQuery).toHaveBeenCalledWith(
       expect.objectContaining({

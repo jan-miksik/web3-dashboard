@@ -21,7 +21,7 @@ declare module 'vue' {
       /** Optional: Disabled state */
       disabled?: boolean
     }
-    
+
     /**
      * AppKit network button - shows current network with switch option
      */
@@ -43,4 +43,3 @@ declare module 'vue' {
 }
 
 export {}
-

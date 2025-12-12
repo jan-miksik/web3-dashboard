@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import WalletInfo from '../../../app/components/WalletInfo.vue'
 import { useConnection } from '@wagmi/vue'
-import { useWatchedAddress } from '../../../app/composables/useWatchedAddress'
+import type { useWatchedAddress as _useWatchedAddress } from '../../../app/composables/useWatchedAddress'
 
 // Mock @wagmi/vue (hoisted to avoid initialization errors)
 const { mockUseConnection } = vi.hoisted(() => ({
@@ -57,7 +57,7 @@ describe('WalletInfo', () => {
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mount(WalletInfo)
-    
+
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Disconnected')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(false)
   })
@@ -71,7 +71,7 @@ describe('WalletInfo', () => {
 
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Connected')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="address-full"]').text()).toBe(address)
@@ -88,7 +88,7 @@ describe('WalletInfo', () => {
 
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Watch Mode')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="address-full"]').text()).toBe(watchedAddr)
@@ -104,10 +104,10 @@ describe('WalletInfo', () => {
 
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     const copyButton = wrapper.find('[data-testid="copy-address-btn"]')
     await copyButton.trigger('click')
-    
+
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address)
     expect(wrapper.find('.copy-btn.copied').exists()).toBe(true)
   })
@@ -121,10 +121,10 @@ describe('WalletInfo', () => {
 
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     const clearButton = wrapper.find('[data-testid="clear-watch-btn"]')
     await clearButton.trigger('click')
-    
+
     expect(mockClearWatchedAddress).toHaveBeenCalled()
   })
 
@@ -132,7 +132,7 @@ describe('WalletInfo', () => {
     const address = '0x1234567890123456789012345678901234567890'
     const copyError = new Error('Clipboard write failed')
     vi.mocked(navigator.clipboard.writeText).mockRejectedValue(copyError)
-    
+
     mockUseConnection.mockReturnValue({
       isConnected: ref(true),
       address: ref(address),
@@ -141,10 +141,10 @@ describe('WalletInfo', () => {
     const { handleError } = await import('../../../app/utils/error-handler')
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     const copyButton = wrapper.find('[data-testid="copy-address-btn"]')
     await copyButton.trigger('click')
-    
+
     expect(handleError).toHaveBeenCalled()
   })
 
@@ -157,9 +157,8 @@ describe('WalletInfo', () => {
 
     const wrapper = mount(WalletInfo)
     await wrapper.vm.$nextTick()
-    
+
     const shortAddress = wrapper.find('[data-testid="address-short"]').text()
     expect(shortAddress).toBe('0x1234...7890')
   })
 })
-

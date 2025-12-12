@@ -27,7 +27,7 @@ describe('chains utils', () => {
 
     it('should return metadata for all supported chains', () => {
       const supportedChains = [1, 137, 8453, 42161, 10, 43114, 250, 42220, 100, 324]
-      
+
       supportedChains.forEach(chainId => {
         const metadata = getChainMetadata(chainId)
         expect(metadata).toBeDefined()

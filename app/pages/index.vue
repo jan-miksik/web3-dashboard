@@ -1,19 +1,14 @@
-<script setup lang="ts">
-// Dashboard page
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <div class="dashboard">
-    <!-- Connect Wallet Modal -->
     <ConnectWalletModal />
 
     <div class="dashboard-grid">
-      <!-- Top Row: Wallet Info -->
       <div class="grid-row info-row">
         <WalletInfo />
       </div>
 
-      <!-- Main Row: Token List -->
       <div class="grid-row tokens-row">
         <TokenList />
       </div>
@@ -64,7 +59,6 @@
   grid-template-columns: 1fr;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .dashboard-header {
     margin-bottom: 24px;
@@ -79,4 +73,3 @@
   }
 }
 </style>
-
