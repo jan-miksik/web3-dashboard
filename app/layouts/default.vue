@@ -31,18 +31,22 @@ function calculateScrollbarWidth(): number {
   return width
 }
 
+let resizeHandler: (() => void) | null = null
+
 onMounted(() => {
   scrollbarWidth.value = calculateScrollbarWidth()
 
   // Update on resize (in case zoom level changes scrollbar width)
-  const handleResize = () => {
+  resizeHandler = () => {
     scrollbarWidth.value = calculateScrollbarWidth()
   }
-  window.addEventListener('resize', handleResize)
+  window.addEventListener('resize', resizeHandler)
+})
 
-  onUnmounted(() => {
-    window.removeEventListener('resize', handleResize)
-  })
+onUnmounted(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+  }
 })
 </script>
 

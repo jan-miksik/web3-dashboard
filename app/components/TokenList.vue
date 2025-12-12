@@ -69,11 +69,6 @@ const chainsWithoutAssets = computed(() => {
   return CHAIN_METADATA.filter(chain => !chainsWithAssetsIds.has(chain.id))
 })
 
-// All available chains, sorted: chains with assets first, then chains without assets
-const availableChains = computed(() => {
-  return [...chainsWithAssets.value, ...chainsWithoutAssets.value]
-})
-
 const highValueTokens = computed(() => {
   let result = tokens.value
 
