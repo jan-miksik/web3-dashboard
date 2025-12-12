@@ -109,6 +109,7 @@ describe('ConnectWalletModal', () => {
   })
 
   it('should handle address input and auto-watch valid address', async () => {
+    vi.useFakeTimers()
     mockIsValidAddress.mockReturnValue(true)
 
     const wrapper = mountModal()
@@ -117,7 +118,13 @@ describe('ConnectWalletModal', () => {
     await input.setValue('0x1234567890123456789012345678901234567890')
     await input.trigger('input')
 
+    // Advance timers to trigger debounced auto-watch (500ms delay)
+    vi.advanceTimersByTime(500)
+    await wrapper.vm.$nextTick()
+
     expect(mockSetWatchedAddress).toHaveBeenCalledWith('0x1234567890123456789012345678901234567890')
+
+    vi.useRealTimers()
   })
 
   it('should show error for invalid address input', async () => {
