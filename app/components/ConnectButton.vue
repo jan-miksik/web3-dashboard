@@ -12,12 +12,6 @@ const buttonText = computed(() => {
   return 'Connect Wallet'
 })
 
-const buttonClass = computed(() => {
-  return {
-    connected: address.value !== null || isConnected.value,
-  }
-})
-
 function handleConnectClick() {
   appKit.open()
 }
@@ -26,8 +20,7 @@ function handleConnectClick() {
 <template>
   <div class="connect-button-wrapper" data-testid="connect-button-wrapper">
     <button
-      class="connect-button"
-      :class="buttonClass"
+      :class="['connect-button', { connected: isConnected || address }]"
       data-testid="connect-button"
       @click="handleConnectClick"
     >
@@ -48,7 +41,7 @@ function handleConnectClick() {
   gap: 8px;
   width: 100%;
   padding: 12px 24px;
-  background: var(--accent-primary);
+  background: #21c661;
   border: none;
   border-radius: var(--radius-md);
   color: white;
@@ -59,7 +52,7 @@ function handleConnectClick() {
 }
 
 .connect-button:hover {
-  background: var(--accent-hover);
+  background: #21c661;
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
@@ -71,14 +64,6 @@ function handleConnectClick() {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-}
-
-.connect-button.connected {
-  background: #21c661;
-}
-
-.connect-button.connected:hover {
-  background: #21c661;
 }
 
 .connect-button.loading {

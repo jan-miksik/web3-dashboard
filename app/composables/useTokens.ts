@@ -256,11 +256,6 @@ export function useTokens() {
   const currentChainId = useChainId()
   const { watchedAddress } = useWatchedAddress()
 
-  // Show connected if address exists (even if not fully connected yet during reconnection)
-  const effectiveConnected = computed(() => {
-    return !!address.value || isConnected.value
-  })
-
   // Prioritize address.value if it exists (regardless of connection state)
   const effectiveAddress = computed(() => {
     if (address.value) {
@@ -345,7 +340,7 @@ export function useTokens() {
     error,
     refetch,
     networkName,
-    isConnected: effectiveConnected, // Use frozen state to prevent flash
+    isConnected,
     totalUsdValue,
     currentChainId,
   }
