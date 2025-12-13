@@ -1,8 +1,8 @@
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useConnection, useChainId } from '@wagmi/vue'
-import { config } from '~/chains-config'
 import { useWatchedAddress } from './useWatchedAddress'
+import { defaultWagmiConfig } from '~/utils/wagmi'
 import { ZERION_TO_CHAIN_ID, getChainName } from '~/utils/chains'
 import { logger } from '~/utils/logger'
 import { handleError } from '~/utils/error-handler'
@@ -30,7 +30,7 @@ export interface Token {
 }
 
 async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
-  const supportedChainIds = config.chains.map(chain => chain.id)
+  const supportedChainIds = defaultWagmiConfig.chains.map(chain => chain.id)
 
   const params = new URLSearchParams({
     address: walletAddress,
@@ -252,12 +252,18 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
 }
 
 export function useTokens() {
-  const { address, isConnected } = useConnection({ config })
-  const currentChainId = useChainId({ config })
+  const { address, isConnected } = useConnection()
+  const currentChainId = useChainId()
   const { watchedAddress } = useWatchedAddress()
 
+  // Show connected if address exists (even if not fully connected yet during reconnection)
+  const effectiveConnected = computed(() => {
+    return !!address.value || isConnected.value
+  })
+
+  // Prioritize address.value if it exists (regardless of connection state)
   const effectiveAddress = computed(() => {
-    if (isConnected.value && address.value) {
+    if (address.value) {
       return address.value
     }
     return watchedAddress.value
@@ -339,7 +345,7 @@ export function useTokens() {
     error,
     refetch,
     networkName,
-    isConnected,
+    isConnected: effectiveConnected, // Use frozen state to prevent flash
     totalUsdValue,
     currentChainId,
   }

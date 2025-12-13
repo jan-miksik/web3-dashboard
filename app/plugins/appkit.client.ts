@@ -1,13 +1,20 @@
 import { defineNuxtPlugin } from '#app'
 import { createAppKit } from '@reown/appkit/vue'
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import type { AppKitNetwork } from '@reown/appkit/networks'
-
-import { mainnet, base, optimism, arbitrum, polygon } from '@reown/appkit/networks'
+import { appKitNetworks, getWagmiAdapter } from '~/utils/wagmi'
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
   const projectId = config.public.reownProjectId
+
+  // Guard against multiple AppKit initializations (HMR / repeated plugin runs)
+  // This can cause auth/wagmi state to flap (connect → disconnect) during social login flows.
+  const globalKey = '__web3_dashboard_appkit_initialized__'
+  if (typeof globalThis !== 'undefined' && (globalThis as Record<string, unknown>)[globalKey]) {
+    return
+  }
+  if (typeof globalThis !== 'undefined') {
+    ;(globalThis as Record<string, unknown>)[globalKey] = true
+  }
 
   // Get app URL from runtime config, with fallback to localhost for development
   const getAppUrl = (): string => {
@@ -46,22 +53,22 @@ export default defineNuxtPlugin(() => {
     icons: ['/favicon.ico'],
   }
 
-  const networks: [AppKitNetwork, ...AppKitNetwork[]] = [mainnet, base, optimism, arbitrum, polygon]
+  if (!projectId) {
+    return
+  }
 
-  const wagmiAdapter = new WagmiAdapter({
-    projectId,
-    networks,
-  })
+  const wagmiAdapter = getWagmiAdapter(projectId)
 
   createAppKit({
     adapters: [wagmiAdapter],
-    networks,
+    networks: appKitNetworks,
     projectId,
     metadata,
     features: {
+      connectMethodsOrder: ['social', 'email', 'wallet'],
       analytics: false,
-      email: false,
-      socials: false,
+      email: true,
+      socials: ['google', 'github', 'apple', 'facebook', 'x', 'discord', 'farcaster'],
     },
     themeMode: 'dark',
     themeVariables: {

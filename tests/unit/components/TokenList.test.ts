@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import TokenList from '../../../app/components/TokenList.vue'
+import { useConnection } from '@wagmi/vue'
 
 const mockTokens = ref<any[]>([])
 const mockIsLoading = ref(false)
@@ -9,6 +10,14 @@ const mockError = ref<unknown>(null)
 const mockIsConnected = ref(true)
 const mockTotalUsdValue = ref(0)
 const mockRefetch = vi.fn()
+
+// Mock @wagmi/vue (hoisted to avoid initialization errors)
+const { mockUseConnection } = vi.hoisted(() => ({
+  mockUseConnection: vi.fn(),
+}))
+vi.mock('@wagmi/vue', () => ({
+  useConnection: mockUseConnection,
+}))
 
 vi.mock('../../../app/composables/useTokens', () => ({
   useTokens: vi.fn(() => ({
@@ -55,6 +64,11 @@ describe('TokenList', () => {
     mockError.value = null
     mockIsConnected.value = true
     mockTotalUsdValue.value = 0
+    // Set default mock return value for useConnection
+    mockUseConnection.mockReturnValue({
+      isConnected: ref(true),
+      address: ref('0x1234567890123456789012345678901234567890'),
+    } as unknown as ReturnType<typeof useConnection>)
     vi.stubGlobal('navigator', navigator)
     Object.defineProperty(navigator, 'clipboard', {
       value: {

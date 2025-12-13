@@ -1,16 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import WalletInfo from '../../../app/components/WalletInfo.vue'
 import { useConnection } from '@wagmi/vue'
 import type { useWatchedAddress as _useWatchedAddress } from '../../../app/composables/useWatchedAddress'
 
 // Mock @wagmi/vue (hoisted to avoid initialization errors)
-const { mockUseConnection } = vi.hoisted(() => ({
+const { mockUseConnection, mockUseChainId, mockUseConfig, mockUseBytecode } = vi.hoisted(() => ({
   mockUseConnection: vi.fn(),
+  mockUseChainId: vi.fn(),
+  mockUseConfig: vi.fn(),
+  mockUseBytecode: vi.fn(),
 }))
 vi.mock('@wagmi/vue', () => ({
   useConnection: mockUseConnection,
+  useChainId: mockUseChainId,
+  useConfig: mockUseConfig,
+  useBytecode: mockUseBytecode,
+}))
+
+// Mock @reown/appkit/vue
+const { mockUseAppKit } = vi.hoisted(() => ({
+  mockUseAppKit: vi.fn(),
+}))
+vi.mock('@reown/appkit/vue', () => ({
+  useAppKit: mockUseAppKit,
 }))
 
 // Mock useWatchedAddress
@@ -24,22 +38,38 @@ vi.mock('../../../app/composables/useWatchedAddress', () => ({
   })),
 }))
 
-// Mock chains-config
-vi.mock('../../../app/chains-config', () => ({
-  config: {
-    chains: [],
-  },
-}))
-
 // Mock error-handler
 vi.mock('../../../app/utils/error-handler', () => ({
   handleError: vi.fn(),
 }))
 
 describe('WalletInfo', () => {
+  const mountWalletInfo = () =>
+    mount(WalletInfo, {
+      global: {
+        stubs: {
+          // Avoid requiring AppKit initialization in unit tests.
+          ConnectButton: { template: '<div data-testid="connect-button-stub" />' },
+        },
+      },
+    })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mockWatchedAddress.value = null
+
+    mockUseChainId.mockReturnValue(ref(1))
+    mockUseConfig.mockReturnValue({} as unknown)
+    mockUseBytecode.mockReturnValue({
+      data: ref('0x'),
+      isLoading: ref(false),
+      isError: ref(false),
+    })
+    // Mock AppKit - no embeddedWalletInfo by default (will fallback to bytecode check)
+    mockUseAppKit.mockReturnValue({
+      embeddedWalletInfo: ref(null),
+    })
+
     // Mock clipboard API
     vi.stubGlobal('navigator', navigator)
     Object.defineProperty(navigator, 'clipboard', {
@@ -56,7 +86,7 @@ describe('WalletInfo', () => {
       address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mount(WalletInfo)
+    const wrapper = mountWalletInfo()
 
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Disconnected')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(false)
@@ -69,8 +99,8 @@ describe('WalletInfo', () => {
       address: ref(address),
     } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
+    const wrapper = mountWalletInfo()
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Connected')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(true)
@@ -86,8 +116,8 @@ describe('WalletInfo', () => {
       address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
+    const wrapper = mountWalletInfo()
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="status-badge"]').text()).toContain('Watch Mode')
     expect(wrapper.find('[data-testid="wallet-details"]').exists()).toBe(true)
@@ -101,8 +131,8 @@ describe('WalletInfo', () => {
       address: ref(address),
     } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
+    const wrapper = mountWalletInfo()
+    await flushPromises()
 
     const copyButton = wrapper.find('[data-testid="copy-address-btn"]')
     await copyButton.trigger('click')
@@ -122,8 +152,8 @@ describe('WalletInfo', () => {
     } as unknown as ReturnType<typeof useConnection>)
 
     const { handleError } = await import('../../../app/utils/error-handler')
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
+    const wrapper = mountWalletInfo()
+    await flushPromises()
 
     const copyButton = wrapper.find('[data-testid="copy-address-btn"]')
     await copyButton.trigger('click')
@@ -138,8 +168,8 @@ describe('WalletInfo', () => {
       address: ref(address),
     } as unknown as ReturnType<typeof useConnection>)
 
-    const wrapper = mount(WalletInfo)
-    await wrapper.vm.$nextTick()
+    const wrapper = mountWalletInfo()
+    await flushPromises()
 
     const shortAddress = wrapper.find('[data-testid="address-short"]').text()
     expect(shortAddress).toBe('0x1234...7890')

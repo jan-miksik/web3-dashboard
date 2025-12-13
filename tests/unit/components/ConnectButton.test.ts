@@ -20,13 +20,6 @@ vi.mock('@reown/appkit/vue', () => ({
   })),
 }))
 
-// Mock chains-config
-vi.mock('../../../app/chains-config', () => ({
-  config: {
-    chains: [],
-  },
-}))
-
 describe('ConnectButton', () => {
   beforeEach(() => {
     vi.clearAllMocks()

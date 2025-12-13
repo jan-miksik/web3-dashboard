@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useConnection } from '@wagmi/vue'
-import { config } from '~/chains-config'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
 // Constants
@@ -29,7 +28,7 @@ const VALIDATION = {
   SUCCESS_MESSAGE_DURATION_MS: 3000,
 } as const
 
-const { isConnected } = useConnection({ config })
+const { isConnected, address } = useConnection()
 const { watchedAddress, setWatchedAddress, clearWatchedAddress, isValidAddress } =
   useWatchedAddress()
 
@@ -38,25 +37,36 @@ const addressError = ref('')
 const addressSuccess = ref(false)
 const modalContentRef = ref<HTMLElement | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let focusTrapHandler: ((e: KeyboardEvent) => void) | null = null
 
-const showModal = computed(() => !isConnected.value && !watchedAddress.value)
+// Only show modal when no address is set (neither connected nor watching)
+const showModal = computed(() => !address.value && !watchedAddress.value && !isConnected.value)
 
-watch(isConnected, connected => {
-  if (connected) {
-    clearWatchedAddress()
-  }
-})
+// Watch for connection changes and sync state
+watch(
+  isConnected,
+  connected => {
+    if (connected) {
+      clearWatchedAddress()
+    }
+  },
+  { immediate: true }
+)
 
 // Focus trap: Watch for modal visibility and manage focus
-watch(showModal, async isVisible => {
-  if (isVisible) {
-    await nextTick()
-    focusFirstElement()
-    setupFocusTrap()
-  } else {
-    removeFocusTrap()
-  }
-})
+watch(
+  showModal,
+  async isVisible => {
+    if (isVisible) {
+      await nextTick()
+      focusFirstElement()
+      setupFocusTrap()
+    } else {
+      removeFocusTrap()
+    }
+  },
+  { immediate: true }
+)
 
 function focusFirstElement() {
   if (!modalContentRef.value) return
@@ -72,8 +82,6 @@ function focusFirstElement() {
     firstFocusable.focus()
   }
 }
-
-let focusTrapHandler: ((e: KeyboardEvent) => void) | null = null
 
 function setupFocusTrap() {
   focusTrapHandler = (e: KeyboardEvent) => {

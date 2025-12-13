@@ -28,13 +28,6 @@ vi.mock('../../../app/composables/useWatchedAddress', () => ({
   })),
 }))
 
-// Mock chains-config
-vi.mock('../../../app/chains-config', () => ({
-  config: {
-    chains: [],
-  },
-}))
-
 // Mock ConnectButton component
 vi.mock('../../../app/components/ConnectButton.vue', () => ({
   default: {
@@ -58,6 +51,7 @@ describe('ConnectWalletModal', () => {
     mockWatchedAddress.value = null
     mockUseConnection.mockReturnValue({
       isConnected: ref(false),
+      address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
     mockIsValidAddress.mockReturnValue(false)
   })
@@ -65,6 +59,7 @@ describe('ConnectWalletModal', () => {
   it('should show modal when wallet is not connected and no watched address', () => {
     mockUseConnection.mockReturnValue({
       isConnected: ref(false),
+      address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()
@@ -75,6 +70,7 @@ describe('ConnectWalletModal', () => {
   it('should hide modal when wallet is connected', () => {
     mockUseConnection.mockReturnValue({
       isConnected: ref(true),
+      address: ref('0x1234567890123456789012345678901234567890'),
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()
@@ -85,6 +81,7 @@ describe('ConnectWalletModal', () => {
   it('should hide modal when watched address is set', () => {
     mockUseConnection.mockReturnValue({
       isConnected: ref(false),
+      address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
     mockWatchedAddress.value = '0x1234567890123456789012345678901234567890'
 
@@ -95,8 +92,10 @@ describe('ConnectWalletModal', () => {
 
   it('should clear watched address when wallet connects', async () => {
     const isConnectedRef = ref(false)
+    const addressRef = ref<string | null>(null)
     mockUseConnection.mockReturnValue({
       isConnected: isConnectedRef,
+      address: addressRef,
     } as unknown as ReturnType<typeof useConnection>)
 
     const wrapper = mountModal()

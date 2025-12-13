@@ -30,6 +30,7 @@
     "@reown/appkit": "^1.8.14",
     "@reown/appkit-adapter-wagmi": "^1.8.14",
     "@tanstack/vue-query": "^5.92.1",
+    "@wagmi/core": "^3.0.0",
     "@wagmi/vue": "^0.4.3",
     "eslint": "^9.0.0",
     "nuxt": "^4.2.1",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useConnection } from '@wagmi/vue'
 import { useTokens } from '~/composables/useTokens'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
@@ -12,7 +13,9 @@ const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
 
 const { tokens, isLoading, error, refetch, isConnected } = useTokens()
 const { watchedAddress } = useWatchedAddress()
-const hasAddress = computed(() => isConnected.value || !!watchedAddress.value)
+const { address } = useConnection()
+// Show tokens if address exists, is connected, or watching an address
+const hasAddress = computed(() => !!address.value || isConnected.value || !!watchedAddress.value)
 const showLowValueAssets = ref(false)
 const selectedChainIds = ref<Set<number>>(new Set()) // Empty set = all chains
 const showChainFilter = ref(false)

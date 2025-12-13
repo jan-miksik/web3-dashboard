@@ -18,8 +18,8 @@ vi.mock('@wagmi/vue', () => ({
   useChainId: vi.fn(() => ({ value: 1 })),
 }))
 
-vi.mock('../../../app/chains-config', () => ({
-  config: {
+vi.mock('../../../app/utils/wagmi', () => ({
+  defaultWagmiConfig: {
     chains: [{ id: 1 }, { id: 137 }],
   },
 }))

@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
-import { config } from '~/chains-config'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import { handleError } from '~/utils/error-handler'
 
-const { address, isConnected } = useConnection({ config })
+const { address, isConnected } = useConnection()
 const { watchedAddress } = useWatchedAddress()
 
 const effectiveAddress = computed(() => {
-  if (isConnected.value && address.value) {
+  if (address.value) {
     return address.value
   }
   return watchedAddress.value
@@ -20,7 +19,11 @@ const shortAddress = computed(() => {
   return `${effectiveAddress.value.slice(0, 6)}...${effectiveAddress.value.slice(-4)}`
 })
 
-const isWatchMode = computed(() => !isConnected.value && !!watchedAddress.value)
+// Only watch mode if no address exists but a watched address is set
+const isWatchMode = computed(() => !address.value && !!watchedAddress.value)
+
+// Show connected state if address exists or is connected
+const showConnected = computed(() => !!address.value || isConnected.value)
 
 const isCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
@@ -52,17 +55,19 @@ async function copyAddress() {
 <template>
   <div class="card wallet-info">
     <div class="card-header">
-      <h3 class="card-title">Wallet</h3>
+      <div class="wallet-header-left">
+        <h3 class="card-title">Wallet</h3>
+      </div>
       <span
         class="status-badge"
         data-testid="status-badge"
-        :class="isConnected ? 'connected' : isWatchMode ? 'watch-mode' : 'disconnected'"
+        :class="showConnected ? 'connected' : isWatchMode ? 'watch-mode' : 'disconnected'"
       >
-        {{ isConnected ? 'Connected' : isWatchMode ? 'Watch Mode' : 'Disconnected' }}
+        {{ showConnected ? 'Connected' : isWatchMode ? 'Watch Mode' : 'Disconnected' }}
       </span>
     </div>
 
-    <div v-if="isConnected || isWatchMode" class="wallet-details" data-testid="wallet-details">
+    <div v-if="showConnected || isWatchMode" class="wallet-details" data-testid="wallet-details">
       <div class="detail-row">
         <div class="address-container">
           <span class="detail-value font-mono address-full" data-testid="address-full">{{
@@ -139,6 +144,13 @@ async function copyAddress() {
 <style scoped>
 .wallet-info {
   min-height: 120px;
+}
+
+.wallet-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .status-badge {

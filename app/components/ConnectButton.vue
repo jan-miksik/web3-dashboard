@@ -2,23 +2,34 @@
 import { computed } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { useAppKit } from '@reown/appkit/vue'
-import { config } from '~/chains-config'
 
-const { isConnected } = useConnection({ config })
+const { isConnected, address } = useConnection()
+const appKit = useAppKit()
 
 const buttonText = computed(() => {
-  if (isConnected.value) return 'Wallet Menu'
+  // Show "Wallet Menu" if address is set (connected or has address)
+  if (address.value || isConnected.value) return 'Wallet Menu'
   return 'Connect Wallet'
 })
+
+const buttonClass = computed(() => {
+  return {
+    connected: address.value !== null || isConnected.value,
+  }
+})
+
+function handleConnectClick() {
+  appKit.open()
+}
 </script>
 
 <template>
   <div class="connect-button-wrapper" data-testid="connect-button-wrapper">
     <button
       class="connect-button"
-      :class="{ connected: isConnected }"
+      :class="buttonClass"
       data-testid="connect-button"
-      @click="useAppKit().open()"
+      @click="handleConnectClick"
     >
       <span data-testid="connect-button-text">{{ buttonText }}</span>
     </button>

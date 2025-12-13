@@ -47,6 +47,15 @@ export default defineNuxtConfig({
     define: {
       'process.env': {},
     },
+    /**
+     * Some web3 deps (e.g. `rpc-websockets`) pull in CJS `eventemitter3/index.js`.
+     * If Vite doesn't prebundle it, Nuxt dev can end up serving that CJS file
+     * directly to the browser via `@fs`, which then fails with:
+     * "does not provide an export named 'default'".
+     */
+    optimizeDeps: {
+      include: ['rpc-websockets', 'eventemitter3'],
+    },
     vue: {
       template: {
         compilerOptions: {

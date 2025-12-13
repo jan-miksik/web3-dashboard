@@ -189,3 +189,13 @@ button {
     grid-template-columns: repeat(1, 1fr);
   }
 }
+
+/* Fix for SVG elements with empty width attributes (AppKit fix) */
+svg[width=''] {
+  width: auto;
+}
+
+svg:not([width]):not([height]) {
+  width: 1em;
+  height: 1em;
+}

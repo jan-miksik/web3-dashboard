@@ -22,7 +22,7 @@ const CHAIN_ICONS: Record<number, string> = {
   324: 'https://icons.llamao.fi/icons/chains/rsz_zksync.jpg',
 }
 
-// Chain metadata - must match chains-config.ts
+// Chain metadata - must match the chains in `defaultWagmiConfig`
 export const CHAIN_METADATA: ChainMetadata[] = [
   {
     id: 1,
