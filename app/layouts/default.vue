@@ -12,6 +12,8 @@ const isDev = import.meta.dev
 
 const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]
 
+const SHOW_TEST_NOTIFICATIONS = false
+
 // Test notification functions (dev only)
 function testError() {
   showErrorNotification('This is a test error notification')
@@ -86,7 +88,7 @@ onUnmounted(() => {
 
       <div class="header-right">
         <!-- Test notification buttons (dev only) -->
-        <div v-if="isDev" class="test-notifications">
+        <div v-if="isDev && SHOW_TEST_NOTIFICATIONS" class="test-notifications">
           <button class="test-btn test-btn-error" title="Test Error" @click="testError">✖</button>
           <button class="test-btn test-btn-warning" title="Test Warning" @click="testWarning">
             ⚠
