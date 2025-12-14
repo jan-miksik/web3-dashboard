@@ -9,6 +9,7 @@
  */
 
 import { logger } from './logger'
+import { showNotification as showNotif } from '~/composables/useNotifications'
 
 export interface ErrorHandlerOptions {
   /**
@@ -104,29 +105,37 @@ function getUserFriendlyMessage(error: unknown, customMessage?: string): string 
 
 /**
  * Shows a notification to the user
- * This is a placeholder - you should integrate with your notification system
+ * Uses the centralized notification system
  */
 function showNotification(
   message: string,
   type: 'error' | 'warning' | 'info' = 'error',
   isClient: boolean = import.meta.client
 ): void {
-  // TODO: Integrate with your notification/toast system
-  // Examples:
-  // - Nuxt UI: useToast()
-  // - Vue Toastification
-  // - Custom notification composable
+  if (!isClient) {
+    return
+  }
 
-  if (isClient) {
-    console.warn(`[Notification ${type}]: ${message}`)
-
-    // Example integration (uncomment and adapt to your notification system):
-    // const toast = useToast()
-    // toast.add({
-    //   title: type === 'error' ? 'Error' : 'Warning',
-    //   description: message,
-    //   color: type === 'error' ? 'red' : 'yellow',
-    // })
+  try {
+    switch (type) {
+      case 'error':
+        showNotif(message, 'error', 7000) // Show errors for 7 seconds
+        break
+      case 'warning':
+        showNotif(message, 'warning', 6000) // Show warnings for 6 seconds
+        break
+      case 'info':
+        showNotif(message, 'info', 5000) // Show info for 5 seconds
+        break
+      default:
+        showNotif(message, 'error', 7000)
+    }
+  } catch (error) {
+    // Fallback to console if notification system is not available
+    // This should not happen in normal operation, but provides a safety net
+    if (import.meta.dev) {
+      console.warn(`[Notification ${type}]: ${message}`, error)
+    }
   }
 }
 

@@ -186,6 +186,90 @@ alwaysApply: true
     const { data, error } = useFetch('/api/zerion/positions')
     ```
 
+## Component Architecture & Splitting
+
+**Components should be kept small and focused. Large components must be split into smaller, reusable parts.**
+
+### Component Size Guidelines
+
+- **Maximum component size:** Components should not exceed ~300-400 lines of code (including template, script, and styles)
+- **If a component exceeds this limit:** Split it into smaller sub-components and extract business logic into composables
+
+### When to Split Components
+
+1. **Component exceeds ~300-400 lines:** Break it down into smaller, focused components
+2. **Repeated UI patterns:** Extract into reusable sub-components
+3. **Complex business logic:** Move logic to composables (hooks) in `~/composables` directory
+4. **Multiple responsibilities:** Split into separate components, each handling one concern
+5. **Large template sections:** Extract distinct UI sections into their own components
+
+### How to Split Components
+
+1. **Extract business logic to composables:**
+   - Move state management, computed properties, watchers, and functions to a composable
+   - Keep components focused on presentation and user interaction
+   - Example: `useTokenList.ts` composable for TokenList component logic
+
+2. **Create focused sub-components:**
+   - Extract distinct UI sections (header, table, filters, states) into separate components
+   - Each sub-component should have a single, clear responsibility
+   - Example: `TokenListHeader.vue`, `TokenTable.vue`, `TokenRow.vue`, `NetworkFilter.vue`
+
+3. **Component structure:**
+   ```
+   LargeComponent.vue (orchestrator)
+   ├── ComponentHeader.vue (header section)
+   ├── ComponentTable.vue (table/list section)
+   ├── ComponentFilter.vue (filter section)
+   └── ComponentStates.vue (empty/error/loading states)
+   ```
+
+### Example Structure
+
+```vue
+<!-- ✅ Correct - Small, focused component using composable -->
+<script setup lang="ts">
+import { useTokenList } from '~/composables/useTokenList'
+
+const {
+  tokens,
+  isLoading,
+  error,
+  // ... other properties and methods
+} = useTokenList()
+</script>
+
+<template>
+  <div class="token-list">
+    <TokenListHeader ... />
+    <TokenListStates ... />
+    <TokenTable ... />
+  </div>
+</template>
+```
+
+```vue
+<!-- ❌ Wrong - Large monolithic component with all logic -->
+<script setup lang="ts">
+// 200+ lines of business logic mixed with component code
+const tokens = ref([])
+const isLoading = ref(false)
+// ... many more state variables and functions
+</script>
+
+<template>
+  <!-- 500+ lines of template with nested logic -->
+</template>
+```
+
+### Benefits of Component Splitting
+
+- **Maintainability:** Easier to understand and modify smaller components
+- **Reusability:** Sub-components can be reused in other contexts
+- **Testability:** Smaller components are easier to test in isolation
+- **Performance:** Better code splitting and tree-shaking
+- **Collaboration:** Multiple developers can work on different components simultaneously
+
 ## Additional Best Practices
 
 - Use meaningful variable and function names

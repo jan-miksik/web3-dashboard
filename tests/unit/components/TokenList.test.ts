@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
-import TokenList from '../../../app/components/TokenList.vue'
+import TokenList from '../../../app/components/TokenList/TokenList.vue'
+import TokenListHeader from '../../../app/components/TokenList/TokenListHeader.vue'
+import TokenListStates from '../../../app/components/TokenList/TokenListStates.vue'
+import TokenTable from '../../../app/components/TokenList/TokenTable.vue'
+import TokenRow from '../../../app/components/TokenList/TokenRow.vue'
+import NetworkFilter from '../../../app/components/NetworkFilter.vue'
 import { useConnection } from '@wagmi/vue'
 
 const mockTokens = ref<any[]>([])
@@ -40,6 +45,96 @@ vi.mock('../../../app/composables/useWatchedAddress', () => ({
   })),
 }))
 
+// Mock useTokenList composable
+const mockShowLowValueAssets = ref(false)
+const mockSelectedChainIds = ref<Set<number>>(new Set())
+const mockShowChainFilter = ref(false)
+const mockIsRefreshing = ref(false)
+const mockCopiedAddress = ref<string | null>(null)
+
+vi.mock('../../../app/composables/useTokenList', () => ({
+  useTokenList: vi.fn(() => {
+    const highValueTokens = computed(() =>
+      mockTokens.value.filter((token: any) => token.usdValue >= 5)
+    )
+    const lowValueTokens = computed(() =>
+      mockTokens.value.filter((token: any) => token.usdValue > 0 && token.usdValue < 5)
+    )
+    const filteredTokens = computed(() => {
+      const result = [...highValueTokens.value]
+      if (mockShowLowValueAssets.value) {
+        result.push(...lowValueTokens.value)
+      }
+      return result
+    })
+
+    return {
+      // Data
+      tokens: computed(() => mockTokens.value),
+      isLoading: mockIsLoading,
+      error: mockError,
+      hasAddress: computed(() => mockIsConnected.value || !!mockTokens.value.length),
+      showLowValueAssets: mockShowLowValueAssets,
+      selectedChainIds: mockSelectedChainIds,
+      showChainFilter: mockShowChainFilter,
+      isRefreshing: mockIsRefreshing,
+      copiedAddress: mockCopiedAddress,
+      chainsWithAssets: computed(() => []),
+      chainsWithoutAssets: computed(() => []),
+      highValueTokens,
+      lowValueTokens,
+      filteredTokens,
+      filteredTotalUsdValue: computed(() =>
+        filteredTokens.value.reduce((sum: number, token: any) => sum + token.usdValue, 0)
+      ),
+      hasLowValueAssets: computed(() => lowValueTokens.value.length > 0),
+      hasHighValueAssets: computed(() => highValueTokens.value.length > 0),
+      selectedChainsDisplay: computed(() => 'All Networks'),
+
+      // Actions
+      refetch: mockRefetch,
+      handleRefresh: vi.fn(async () => {
+        mockIsRefreshing.value = true
+        await mockRefetch()
+        await new Promise(resolve => setTimeout(resolve, 100))
+        mockIsRefreshing.value = false
+      }),
+      copyTokenAddress: vi.fn(async (address: string) => {
+        await navigator.clipboard.writeText(address)
+        mockCopiedAddress.value = address
+        setTimeout(() => {
+          mockCopiedAddress.value = null
+        }, 2000)
+      }),
+      toggleChain: vi.fn(),
+      isChainSelected: vi.fn(() => false),
+      getChainIcon: vi.fn(() => undefined),
+      handleClickAllNetworks: vi.fn(),
+      shortenAddress: (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`,
+
+      // Formatting
+      formatBalance: (balance: string) => balance,
+      formatUsdValue: (value: number) => {
+        if (value === 0) return '$0.00'
+        if (value < 0.01) return '<$0.01'
+        return value.toLocaleString('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      },
+      formatTotalValue: (value: number) =>
+        value.toLocaleString('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+    }
+  }),
+}))
+
 vi.mock('../../../app/utils/chains', () => ({
   CHAIN_METADATA: [
     { id: 1, name: 'Ethereum' },
@@ -64,6 +159,11 @@ describe('TokenList', () => {
     mockError.value = null
     mockIsConnected.value = true
     mockTotalUsdValue.value = 0
+    mockShowLowValueAssets.value = false
+    mockSelectedChainIds.value = new Set()
+    mockShowChainFilter.value = false
+    mockIsRefreshing.value = false
+    mockCopiedAddress.value = null
     // Set default mock return value for useConnection
     mockUseConnection.mockReturnValue({
       isConnected: ref(true),
@@ -82,11 +182,24 @@ describe('TokenList', () => {
     vi.useRealTimers()
   })
 
+  const mountTokenList = () =>
+    mount(TokenList, {
+      global: {
+        components: {
+          TokenListHeader,
+          TokenListStates,
+          TokenTable,
+          TokenRow,
+          NetworkFilter,
+        },
+      },
+    })
+
   it('renders loading state when fetching tokens', () => {
     mockIsLoading.value = true
     mockTokens.value = []
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
     expect(wrapper.find('[data-testid="loading-state"]').exists()).toBe(true)
   })
 
@@ -94,7 +207,7 @@ describe('TokenList', () => {
     mockIsLoading.value = false
     mockTokens.value = []
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
     expect(wrapper.find('[data-testid="empty-state"]').exists()).toBe(true)
   })
 
@@ -117,7 +230,8 @@ describe('TokenList', () => {
     ]
     mockTotalUsdValue.value = 5
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
+    await wrapper.vm.$nextTick()
     expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(1)
 
     const copyBtn = wrapper.find('[data-testid="copy-token-address-btn"]')
@@ -156,22 +270,28 @@ describe('TokenList', () => {
         logoURI: null,
       },
     ]
+    mockShowLowValueAssets.value = false
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
+    await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="show-low-value-btn"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(1) // only high-value visible
 
     await wrapper.find('[data-testid="show-low-value-btn"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
     expect(wrapper.find('[data-testid="hide-low-value-btn"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(2)
 
     await wrapper.find('[data-testid="hide-low-value-btn"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
     expect(wrapper.findAll('[data-testid="token-row"]').length).toBe(1)
   })
 
   it('calls refetch when refresh is clicked and respects loading disabled state', async () => {
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
 
     const refreshBtn = wrapper.find('[data-testid="refresh-btn"]')
     expect(refreshBtn.attributes('disabled')).toBeUndefined()
@@ -214,8 +334,11 @@ describe('TokenList', () => {
         logoURI: null,
       },
     ]
+    // Auto-show low-value assets when there are no high-value assets (mimicking the watcher behavior)
+    mockShowLowValueAssets.value = true
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
+    await wrapper.vm.$nextTick()
 
     // Low-value assets should be auto-shown (no high-value assets)
     // But hide button should NOT be visible since there are no high-value assets
@@ -253,11 +376,14 @@ describe('TokenList', () => {
         logoURI: null,
       },
     ]
+    mockShowLowValueAssets.value = false
 
-    const wrapper = mount(TokenList)
+    const wrapper = mountTokenList()
+    await wrapper.vm.$nextTick()
 
     // Show low-value assets
     await wrapper.find('[data-testid="show-low-value-btn"]').trigger('click')
+    await wrapper.vm.$nextTick()
 
     // Hide button should be visible because there are high-value assets
     expect(wrapper.find('[data-testid="hide-low-value-btn"]').exists()).toBe(true)

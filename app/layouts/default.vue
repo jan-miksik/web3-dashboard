@@ -1,9 +1,33 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import {
+  showErrorNotification,
+  showWarningNotification,
+  showInfoNotification,
+  showSuccessNotification,
+} from '~/composables/useNotifications'
 
 const hasProjectId = import.meta.env.NUXT_REOWN_PROJECT_ID !== ''
+const isDev = import.meta.dev
 
 const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]
+
+// Test notification functions (dev only)
+function testError() {
+  showErrorNotification('This is a test error notification')
+}
+
+function testWarning() {
+  showWarningNotification('This is a test warning notification')
+}
+
+function testInfo() {
+  showInfoNotification('This is a test info notification')
+}
+
+function testSuccess() {
+  showSuccessNotification('This is a test success notification')
+}
 
 // Calculate and reserve scrollbar width to prevent layout shift
 const scrollbarWidth = ref(0)
@@ -61,6 +85,18 @@ onUnmounted(() => {
       </div>
 
       <div class="header-right">
+        <!-- Test notification buttons (dev only) -->
+        <div v-if="isDev" class="test-notifications">
+          <button class="test-btn test-btn-error" title="Test Error" @click="testError">✖</button>
+          <button class="test-btn test-btn-warning" title="Test Warning" @click="testWarning">
+            ⚠
+          </button>
+          <button class="test-btn test-btn-info" title="Test Info" @click="testInfo">ⓘ</button>
+          <button class="test-btn test-btn-success" title="Test Success" @click="testSuccess">
+            ✔
+          </button>
+        </div>
+
         <!-- Show AppKit button when Project ID is configured -->
         <template v-if="hasProjectId">
           <ConnectButton />
@@ -103,6 +139,8 @@ onUnmounted(() => {
         <span class="bottom-nav-label">{{ item.label }}</span>
       </NuxtLink>
     </nav>
+
+    <NotificationContainer />
   </div>
 </template>
 
@@ -173,6 +211,63 @@ onUnmounted(() => {
 
 .setup-text {
   font-family: var(--font-mono);
+}
+
+/* Test notification buttons (dev only) */
+.test-notifications {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  padding-right: 12px;
+  border-right: 1px solid var(--border-color);
+}
+
+.test-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.test-btn:hover {
+  background: var(--bg-hover);
+  transform: scale(1.1);
+}
+
+.test-btn:active {
+  transform: scale(0.95);
+}
+
+.test-btn-error:hover {
+  border-color: var(--error);
+  background: var(--error-muted);
+}
+
+.test-btn-warning:hover {
+  border-color: var(--warning);
+  background: var(--warning-muted);
+}
+
+.test-btn-info:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-muted);
+}
+
+.test-btn-success:hover {
+  border-color: var(--success);
+  background: var(--success-muted);
 }
 
 /* Main Container */
@@ -322,6 +417,18 @@ onUnmounted(() => {
 
   .setup-text {
     display: none;
+  }
+
+  .test-notifications {
+    margin-right: 8px;
+    padding-right: 8px;
+    gap: 6px;
+  }
+
+  .test-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 }
 </style>
