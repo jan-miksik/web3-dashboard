@@ -18,7 +18,7 @@ interface Props {
   onFormatTotalValue: (value: number) => string
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const emit = defineEmits<{
   'update:showChainFilter': [value: boolean]
@@ -28,7 +28,7 @@ const emit = defineEmits<{
 <template>
   <div class="card-header">
     <div class="header-title-section">
-      <h3 class="card-title">Net Worth</h3>
+      <h3 class="card-title">Worth in Selection</h3>
       <span v-if="hasAddress && filteredTotalUsdValue > 0" class="total-value">
         {{ onFormatTotalValue(filteredTotalUsdValue) }}
       </span>
@@ -50,6 +50,8 @@ const emit = defineEmits<{
         v-if="hasAddress"
         class="refresh-btn"
         data-testid="refresh-btn"
+        type="button"
+        aria-label="Refresh token balances"
         :disabled="isLoading || isRefreshing"
         title="Refresh balances"
         @click="onRefresh"

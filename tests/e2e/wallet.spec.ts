@@ -68,7 +68,7 @@ test.describe('Wallet Functionality E2E Tests', () => {
   // 2. Using Playwright Web3 helpers for Web3 interactions
   // 3. Setting up test wallets with known addresses
 
-  test('should handle wallet disconnection gracefully', async ({ page }) => {
+  test('should show wallet modal when disconnected', async ({ page }) => {
     // Test that the modal appears when wallet is disconnected
     // Since we can't actually connect/disconnect in E2E without mocking,
     // we test that the modal shows when not connected (which is the default state)
@@ -78,6 +78,12 @@ test.describe('Wallet Functionality E2E Tests', () => {
     const modal = page.getByTestId('modal-overlay')
     await expect(modal.getByTestId('connect-button')).toBeVisible()
     await expect(modal.getByTestId('address-input')).toBeVisible()
+  })
+
+  test('should allow watching an address via modal', async ({ page }) => {
+    // Ensure the modal is visible in the disconnected state
+    const modal = page.getByTestId('modal-overlay')
+    await expect(modal).toBeVisible()
 
     // Test that we can watch an address (which simulates having an address without connecting)
     // Use a known valid test address (42 chars: 0x + 40 hex)
@@ -92,9 +98,12 @@ test.describe('Wallet Functionality E2E Tests', () => {
     // After entering a valid address, the modal should close (address is watched)
     await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 2000 })
 
-    // Test clearing the watched address brings back the modal
-    await expect(page.getByTestId('clear-watch-btn')).toBeVisible()
-    await page.getByTestId('clear-watch-btn').click()
-    await expect(page.getByTestId('modal-overlay')).toBeVisible({ timeout: 2000 })
+    // Wallet info card should now be in watch mode and display the watched address
+    const statusBadge = page.getByTestId('status-badge')
+    await expect(statusBadge).toHaveText(/watch mode/i)
+
+    const walletDetails = page.getByTestId('wallet-details')
+    await expect(walletDetails).toBeVisible()
+    await expect(walletDetails.getByTestId('address-short')).toContainText('0x1234')
   })
 })

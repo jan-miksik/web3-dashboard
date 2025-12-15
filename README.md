@@ -4,28 +4,21 @@ A multi-chain Web3 wallet dashboard built with Nuxt 4, wagmi, viem, and Reown (W
 
 ## Features
 
-- 🔗 **Multi-chain Support**: Ethereum, Polygon, Arbitrum, Base
-- 👛 **Wallet Connection**: Connect via WalletConnect, MetaMask, Coinbase, and more
-- 💰 **Token Balances**: View ERC20 token balances across chains
-- 🌐 **Network Switching**: Easy switching between supported networks
-- 📱 **Responsive Design**: Desktop sidebar, mobile bottom navigation
+- **Multi-chain Support**: Ethereum, Base, Arbitrum, Optimism, Gnosis, Polygon, Avalanche, Fantom, Celo, zkSync Era
+- **Wallet Connection**: Connect via Socials, Email, WalletConnect, MetaMask, Coinbase, and more
+- **Token Balances**: View ERC20 token balances across chains
+
+## Preview
+
+![Web3 Dashboard Preview](./public/preview.png)
 
 ## Tech Stack
 
 - **Framework**: Nuxt 4
 - **Web3**: wagmi, viem, @reown/appkit
-- **State**: @tanstack/vue-query
-- **Styling**: CSS Variables, custom dark theme
+- **Data fetching**: @tanstack/vue-query
 
 ## Setup
-
-### 1. Install Dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -42,10 +35,6 @@ NUXT_APP_URL=https://your-production-domain.com
 # Zerion API Key - REQUIRED for token balance fetching
 # Get yours at https://zerion.io
 NUXT_ZERION_API_KEY=your_zerion_api_key_here
-
-# Alchemy API Key (optional, for enhanced RPC)
-# Get yours at https://alchemy.com
-NUXT_ALCHEMY_API_KEY=your_alchemy_key_here
 ```
 
 Token balances are fetched via the Zerion API, which aggregates data across all supported chains.

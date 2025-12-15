@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
+import { useTokens } from '~/composables/useTokens'
 import { handleError } from '~/utils/error-handler'
 
 const { address, isConnected } = useConnection()
@@ -24,6 +25,20 @@ const isWatchMode = computed(() => !address.value && !!watchedAddress.value)
 
 // Show connected state if address exists or is connected
 const showConnected = computed(() => !!address.value || isConnected.value)
+
+// Tokens / Net worth (independent of selection in the token table)
+const { totalUsdValue, isLoading: isTokensLoading } = useTokens()
+
+const hasNetWorth = computed(() => !isTokensLoading.value && totalUsdValue.value > 0)
+
+function formatTotalValue(value: number): string {
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
 
 const isCopied = ref(false)
 let copyTimeout: ReturnType<typeof setTimeout> | null = null
@@ -131,6 +146,12 @@ async function copyAddress() {
             </svg>
           </button>
         </div>
+      </div>
+      <div v-if="hasNetWorth" class="detail-row net-worth-row">
+        <span class="detail-label">Net Worth</span>
+        <span class="detail-value net-worth-value">
+          {{ formatTotalValue(totalUsdValue) }}
+        </span>
       </div>
     </div>
 

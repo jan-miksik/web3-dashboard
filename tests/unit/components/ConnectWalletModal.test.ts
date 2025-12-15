@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref, computed } from 'vue'
 import ConnectWalletModal from '../../../app/components/ConnectWalletModal.vue'
@@ -54,6 +54,11 @@ describe('ConnectWalletModal', () => {
       address: ref(null),
     } as unknown as ReturnType<typeof useConnection>)
     mockIsValidAddress.mockReturnValue(false)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllTimers()
   })
 
   it('should show modal when wallet is not connected and no watched address', () => {
@@ -122,8 +127,6 @@ describe('ConnectWalletModal', () => {
     await wrapper.vm.$nextTick()
 
     expect(mockSetWatchedAddress).toHaveBeenCalledWith('0x1234567890123456789012345678901234567890')
-
-    vi.useRealTimers()
   })
 
   it('should show error for invalid address input', async () => {

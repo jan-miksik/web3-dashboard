@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { isAddress } from 'viem'
 
 // Watched address state - persisted in localStorage
 const watchedAddressKey = 'web3-dashboard-watched-address'
@@ -29,7 +30,7 @@ export function useWatchedAddress() {
   }
 
   function isValidAddress(address: string): boolean {
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
+    return isAddress(address)
   }
 
   const isWatchMode = computed(() => !!watchedAddress.value)

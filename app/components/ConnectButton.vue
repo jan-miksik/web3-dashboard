@@ -41,8 +41,8 @@ function handleConnectClick() {
   gap: 8px;
   width: 100%;
   padding: 12px 24px;
-  background: #21c661;
-  border: none;
+  background: var(--accent-primary);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: white;
   font-size: 14px;
@@ -52,12 +52,12 @@ function handleConnectClick() {
 }
 
 .connect-button:hover {
-  background: #21c661;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  background: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
 }
 
 .connect-button:active {
-  transform: translateY(0);
+  transform: translateY(1px);
 }
 
 .connect-button:disabled {

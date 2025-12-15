@@ -116,7 +116,7 @@ describe('server/api/zerion/positions.get', () => {
       address: '0x1234567890123456789012345678901234567890',
     })
 
-    // Use dependency injection with empty API key
+    // Use dependency injection with empty API key (treated as misconfigured)
     const getConfig = vi.fn(
       (): MockRuntimeConfig => ({
         zerionApiKey: '',
@@ -129,7 +129,7 @@ describe('server/api/zerion/positions.get', () => {
     expect(createError).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 500,
-        statusMessage: 'Zerion API key is not configured',
+        statusMessage: 'Zerion API key is misconfigured',
       })
     )
   })
@@ -140,7 +140,7 @@ describe('server/api/zerion/positions.get', () => {
       await import('../../../../../server/api/zerion/positions.get')
 
     const walletAddress = '0x1234567890123456789012345678901234567890'
-    const apiKey = 'test-api-key'
+    const apiKey = 'valid-test-api-key-1234567890'
 
     const mockResponse = {
       data: [
@@ -209,7 +209,7 @@ describe('server/api/zerion/positions.get', () => {
       await import('../../../../../server/api/zerion/positions.get')
 
     const walletAddress = '0x1234567890123456789012345678901234567890'
-    const apiKey = 'test-api-key'
+    const apiKey = 'valid-test-api-key-1234567890'
 
     getQuery.mockReturnValue({
       address: walletAddress,
@@ -243,7 +243,7 @@ describe('server/api/zerion/positions.get', () => {
       await import('../../../../../server/api/zerion/positions.get')
 
     const walletAddress = '0x1234567890123456789012345678901234567890'
-    const apiKey = 'test-api-key'
+    const apiKey = 'valid-test-api-key-1234567890'
 
     getQuery.mockReturnValue({
       address: walletAddress,
@@ -280,7 +280,7 @@ describe('server/api/zerion/positions.get', () => {
       await import('../../../../../server/api/zerion/positions.get')
 
     const walletAddress = '0x1234567890123456789012345678901234567890'
-    const apiKey = 'test-api-key'
+    const apiKey = 'valid-test-api-key-1234567890'
 
     const mockResponse = {
       data: [],

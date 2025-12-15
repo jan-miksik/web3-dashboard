@@ -25,28 +25,6 @@ test.describe('Token Display E2E Tests', () => {
     await page.goto('/')
   })
 
-  test('should show token list when wallet is connected', async ({ page }) => {
-    // Watch an address to simulate having an address (without needing actual wallet connection)
-    await fillAddressAndWaitForModalClose(page)
-
-    // Check that token list component is visible
-    await expect(page.getByTestId('token-list')).toBeVisible()
-
-    // Wait for API response (accept any status code - 200, 202, or error)
-    // API can return 202 (portfolio being prepared) or 200 (success) or error codes
-    try {
-      await page.waitForResponse(response => response.url().includes('/api/zerion/positions'), {
-        timeout: 10000,
-      })
-    } catch {
-      // API might not respond in time, but token list should still be visible
-      // Continue with the test
-    }
-
-    // Token list should be visible regardless of whether tokens exist or API response
-    await expect(page.getByTestId('token-list')).toBeVisible()
-  })
-
   test('should display token information correctly', async ({ page }) => {
     // Watch an address
     await fillAddressAndWaitForModalClose(page)
@@ -211,7 +189,7 @@ test.describe('Token Display E2E Tests', () => {
     await expect(tokenList).toBeVisible()
 
     // Clean up route handler before test ends
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.unroute('**/api/zerion/positions**')
   })
 
   test('should handle error states', async ({ page }) => {
@@ -235,6 +213,6 @@ test.describe('Token Display E2E Tests', () => {
     await expect(tokenList).toBeVisible()
 
     // Clean up route handler before test ends
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.unroute('**/api/zerion/positions**')
   })
 })

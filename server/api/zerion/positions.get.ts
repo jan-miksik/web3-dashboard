@@ -1,8 +1,10 @@
 import type { ZerionApiResponse, ZerionPosition, ZerionIncludedItem } from '~/types/zerion'
 import { CHAIN_ID_TO_ZERION } from '~/utils/chains'
 import { ZerionApiResponseSchema } from '~/utils/zerion-schema'
+import { logger } from '~/utils/logger'
 
 import type { H3Event } from 'h3'
+import { isAddress } from 'viem'
 
 const ZERION_API_BASE = 'https://api.zerion.io/v1'
 
@@ -10,6 +12,17 @@ const ZERION_API_BASE = 'https://api.zerion.io/v1'
 function getAuthHeader(apiKey: string): string {
   const credentials = Buffer.from(`${apiKey}:`).toString('base64')
   return `Basic ${credentials}`
+}
+
+function isValidZerionApiKey(apiKey: unknown): apiKey is string {
+  if (typeof apiKey !== 'string') return false
+
+  const trimmed = apiKey.trim()
+  // Basic hardening: non-empty, reasonable length, and restricted charset
+  if (trimmed.length < 20 || trimmed.length > 256) return false
+
+  // Hyphen doesn't need escaping when placed at the end of the character class
+  return /^[A-Za-z0-9_-]+$/.test(trimmed)
 }
 
 // Allow dependency injection for testing
@@ -26,32 +39,64 @@ export async function handlePositionsRequest(
   getConfig: () => ReturnType<typeof useRuntimeConfig> = getRuntimeConfig
 ): Promise<ZerionApiResponse> {
   const query = getQuery(event)
-  const walletAddress = query.address as string
+  const walletAddressRaw = (query.address as string | undefined)?.trim()
 
-  if (!walletAddress) {
+  if (!walletAddressRaw) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Wallet address is required',
     })
   }
 
-  const config = getConfig()
-  const apiKey = config.zerionApiKey as string
+  // Basic wallet address validation & normalization
+  const walletAddress = walletAddressRaw.toLowerCase()
 
-  if (!apiKey) {
+  if (!isAddress(walletAddress)) {
     throw createError({
-      statusCode: 500,
-      statusMessage: 'Zerion API key is not configured',
+      statusCode: 400,
+      statusMessage: 'Invalid wallet address',
     })
   }
 
-  const chainIds = query.chainIds
+  const config = getConfig()
+  const apiKeyRaw = config.zerionApiKey
+
+  if (!isValidZerionApiKey(apiKeyRaw)) {
+    logger.error('Invalid Zerion API key configuration detected', undefined, {
+      apiKeyConfigured: Boolean(apiKeyRaw),
+    })
+
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Zerion API key is misconfigured',
+    })
+  }
+
+  const apiKey = apiKeyRaw.trim()
+
+  const chainIds: string[] = query.chainIds
     ? (Array.isArray(query.chainIds) ? query.chainIds : [query.chainIds]).map(String)
     : Object.keys(CHAIN_ID_TO_ZERION).map(String)
 
+  // Sanitize and validate requested chain IDs
   const zerionChainIds = chainIds
+    .map(id => id.trim())
+    .filter(id => id !== '')
     .map(id => CHAIN_ID_TO_ZERION[Number(id)])
     .filter(Boolean) as string[]
+
+  if (query.chainIds && zerionChainIds.length === 0) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'No valid chain IDs provided',
+    })
+  }
+
+  logger.info('Fetching Zerion wallet positions', {
+    walletAddress,
+    hasCustomChainFilter: Boolean(query.chainIds),
+    chainCount: zerionChainIds.length,
+  })
 
   const apiUrl = `${ZERION_API_BASE}/wallets/${walletAddress}/positions/`
 
@@ -69,13 +114,39 @@ export async function handlePositionsRequest(
   baseParams.append('page[size]', '100')
 
   async function fetchPage(url: string): Promise<ZerionApiResponse> {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: getAuthHeader(apiKey),
-        Accept: 'application/json',
-      },
-    })
+    const controller = new AbortController()
+    const timeoutMs = 15000
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: getAuthHeader(apiKey),
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      })
+    } catch (error) {
+      clearTimeout(timeoutId)
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        logger.warn('Zerion API request aborted due to timeout', {
+          url,
+          timeoutMs,
+          walletAddress,
+        })
+        throw createError({
+          statusCode: 504,
+          statusMessage: 'Upstream Zerion API request timed out',
+        })
+      }
+
+      throw error
+    } finally {
+      clearTimeout(timeoutId)
+    }
 
     if (!response.ok) {
       if (response.status === 202) {
@@ -88,6 +159,14 @@ export async function handlePositionsRequest(
       }
 
       const errorText = await response.text()
+
+      logger.error('Zerion API returned non-OK response', undefined, {
+        status: response.status,
+        url,
+        walletAddress,
+        bodySnippet: errorText.slice(0, 500),
+      })
+
       throw createError({
         statusCode: response.status,
         statusMessage: `Zerion API error: ${errorText}`,
@@ -153,9 +232,10 @@ export async function handlePositionsRequest(
 
         // Safety check to prevent infinite loops
         if (pageCount >= maxPages) {
-          // Note: Using console.warn for server-side logging in this API route
-
-          console.warn(`Reached maximum page limit (${maxPages}) for wallet ${walletAddress}`)
+          logger.warn('Reached maximum Zerion page limit when fetching positions', {
+            walletAddress,
+            maxPages,
+          })
           break
         }
 

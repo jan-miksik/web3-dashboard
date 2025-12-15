@@ -13,9 +13,13 @@ interface Props {
   onClickAllNetworks: () => void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const chainFilterRef = ref<HTMLElement | null>(null)
+
+const emit = defineEmits<{
+  'update:showChainFilter': [value: boolean]
+}>()
 
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
@@ -23,10 +27,6 @@ function handleClickOutside(event: MouseEvent) {
     emit('update:showChainFilter', false)
   }
 }
-
-const emit = defineEmits<{
-  'update:showChainFilter': [value: boolean]
-}>()
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
@@ -46,6 +46,10 @@ onUnmounted(() => {
     <button
       class="network-filter-btn"
       data-testid="network-filter-btn"
+      type="button"
+      aria-haspopup="listbox"
+      :aria-expanded="showChainFilter ? 'true' : 'false'"
+      aria-label="Filter tokens by network"
       :class="{ active: selectedChainIds.size > 0 }"
       @click="$emit('update:showChainFilter', !showChainFilter)"
     >

@@ -29,6 +29,20 @@ export interface Token {
   tokenType: 'native' | 'erc20'
 }
 
+export interface UseTokensOptions {
+  /**
+   * How often to automatically refetch token balances (in ms) while the tab is visible.
+   * Defaults to 5 minutes.
+   */
+  refetchIntervalMs?: number
+
+  /**
+   * Disable automatic background refetching entirely.
+   * Manual refetch (e.g. via refresh button) will still work.
+   */
+  enableAutoRefetch?: boolean
+}
+
 async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   const supportedChainIds = defaultWagmiConfig.chains.map(chain => chain.id)
 
@@ -53,10 +67,12 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   const data = response
 
   // Debug: Log the response structure (only in development)
-  logger.debug('Zerion API Response', {
-    data: JSON.stringify(data, null, 2),
-    keys: Object.keys(data),
-  })
+  if (import.meta.env.DEV) {
+    logger.debug('Zerion API Response', {
+      data: JSON.stringify(data, null, 2),
+      keys: Object.keys(data),
+    })
+  }
 
   // Handle Zerion API response structure: { data: [...], included: [...] }
   let positions: ZerionPosition[] = []
@@ -80,29 +96,32 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   const fetchedTokens: Token[] = positions
     .map((position: ZerionPosition): Token | null => {
       try {
-        const attributes = position.attributes || {}
-        const quantity = attributes.quantity || {}
-        const price = attributes.price
-        const value = attributes.value
+        const attributes = position?.attributes || {}
+        const quantity = attributes?.quantity || {}
+        const price = attributes?.price
+        const value = attributes?.value
 
         // JSON:API format: relationships.chain.data.id
-        const chainId = position.relationships?.chain?.data?.id
-        if (!chainId) {
-          logger.warn('Zerion API: Position missing chain ID', { position })
+        const chainId = position?.relationships?.chain?.data?.id
+
+        if (typeof chainId !== 'string' || chainId.trim() === '') {
+          logger.warn('Zerion API: Position missing or invalid chain ID', { position })
           return null
         }
 
         const numericChainId = ZERION_TO_CHAIN_ID[chainId]
-        if (!numericChainId) {
+
+        if (typeof numericChainId !== 'number' || Number.isNaN(numericChainId)) {
           logger.warn('Zerion API: Unknown chain ID', { chainId })
           return null
         }
 
         // Fungible info might be in relationships.fungible.data or included array
-        let fungibleInfo: ZerionFungibleInfo = attributes.fungible_info || {}
+        let fungibleInfo: ZerionFungibleInfo = attributes?.fungible_info || {}
 
-        const fungibleRelationship = position.relationships?.fungible
-        if (fungibleRelationship?.data) {
+        const fungibleRelationship = position?.relationships?.fungible
+
+        if (fungibleRelationship?.data && typeof fungibleRelationship.data.id === 'string') {
           const fungibleData = included.find(
             (item: ZerionIncludedItem) =>
               item.type === 'fungibles' && item.id === fungibleRelationship.data?.id
@@ -251,7 +270,12 @@ async function fetchTokenBalances(walletAddress: string): Promise<Token[]> {
   return fetchedTokens
 }
 
-export function useTokens() {
+export function useTokens(options: UseTokensOptions = {}) {
+  const {
+    refetchIntervalMs = 1000 * 60 * 5, // 5 minutes
+    enableAutoRefetch = true,
+  } = options
+
   const { address, isConnected } = useConnection()
   const currentChainId = useChainId()
   const { watchedAddress } = useWatchedAddress()
@@ -287,7 +311,26 @@ export function useTokens() {
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
     retry: 2,
-    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
+    // Only refetch on an interval when:
+    // - auto-refetch is enabled and
+    // - running in the browser and
+    // - the tab is visible (Page Visibility API)
+    //
+    // This avoids unnecessary polling when the user is not actively viewing the dashboard,
+    // while still allowing manual refetch via the refresh button.
+    refetchInterval: () => {
+      if (!enableAutoRefetch) {
+        return false
+      }
+
+      if (typeof document === 'undefined') {
+        return refetchIntervalMs
+      }
+
+      const isVisible = document.visibilityState === 'visible'
+
+      return isVisible ? refetchIntervalMs : false
+    },
   })
 
   const tokens = computed(() => (tokensData.value as Token[]) || [])

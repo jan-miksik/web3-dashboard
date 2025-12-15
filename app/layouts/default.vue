@@ -6,8 +6,10 @@ import {
   showInfoNotification,
   showSuccessNotification,
 } from '~/composables/useNotifications'
+import { useRuntimeConfig } from '#app'
 
-const hasProjectId = import.meta.env.NUXT_REOWN_PROJECT_ID !== ''
+const runtimeConfig = useRuntimeConfig()
+const hasProjectId = !!runtimeConfig.public.reownProjectId
 const isDev = import.meta.dev
 
 const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]

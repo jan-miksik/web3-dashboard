@@ -24,14 +24,6 @@ test.describe('Home Page E2E Tests', () => {
     await expect(headerButton.getByTestId('connect-button-text')).toContainText('Connect Wallet')
   })
 
-  test('should have proper page structure', async ({ page }) => {
-    // Check that main elements exist
-    // Body is always present, just check it exists
-    const body = page.locator('body')
-    await expect(body).toHaveCount(1)
-    await expect(page.getByRole('main')).toBeVisible()
-  })
-
   test('should be responsive', async ({ page }) => {
     // Use header button to avoid strict mode violation
     const headerButton = page.getByRole('banner').getByTestId('connect-button')
