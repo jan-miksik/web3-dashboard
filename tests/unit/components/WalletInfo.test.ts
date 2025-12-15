@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import WalletInfo from '../../../app/components/WalletInfo.vue'
 import { useConnection } from '@wagmi/vue'
 import type { useWatchedAddress as _useWatchedAddress } from '../../../app/composables/useWatchedAddress'
+import type { useTokens as _useTokens } from '../../../app/composables/useTokens'
 
 // Mock @wagmi/vue (hoisted to avoid initialization errors)
 const { mockUseConnection, mockUseChainId, mockUseConfig, mockUseBytecode } = vi.hoisted(() => ({
@@ -12,12 +13,21 @@ const { mockUseConnection, mockUseChainId, mockUseConfig, mockUseBytecode } = vi
   mockUseConfig: vi.fn(),
   mockUseBytecode: vi.fn(),
 }))
-vi.mock('@wagmi/vue', () => ({
-  useConnection: mockUseConnection,
-  useChainId: mockUseChainId,
-  useConfig: mockUseConfig,
-  useBytecode: mockUseBytecode,
-}))
+
+vi.mock('@wagmi/vue', () => {
+  // Minimal mock implementation to satisfy usages in `utils/wagmi.ts`
+  const createConfig = vi.fn((config: unknown) => config)
+  const http = vi.fn()
+
+  return {
+    useConnection: mockUseConnection,
+    useChainId: mockUseChainId,
+    useConfig: mockUseConfig,
+    useBytecode: mockUseBytecode,
+    createConfig,
+    http,
+  }
+})
 
 // Mock @reown/appkit/vue
 const { mockUseAppKit } = vi.hoisted(() => ({
@@ -25,6 +35,15 @@ const { mockUseAppKit } = vi.hoisted(() => ({
 }))
 vi.mock('@reown/appkit/vue', () => ({
   useAppKit: mockUseAppKit,
+}))
+
+// Mock useTokens to avoid requiring VueQueryPlugin / queryClient in this unit test
+const { mockUseTokens } = vi.hoisted(() => ({
+  mockUseTokens: vi.fn(),
+}))
+
+vi.mock('../../../app/composables/useTokens', () => ({
+  useTokens: mockUseTokens as unknown as typeof _useTokens,
 }))
 
 // Mock useWatchedAddress
@@ -65,6 +84,10 @@ describe('WalletInfo', () => {
       isLoading: ref(false),
       isError: ref(false),
     })
+    mockUseTokens.mockReturnValue({
+      totalUsdValue: ref(0),
+      isLoading: ref(false),
+    } as unknown as ReturnType<typeof _useTokens>)
     // Mock AppKit - no embeddedWalletInfo by default (will fallback to bytecode check)
     mockUseAppKit.mockReturnValue({
       embeddedWalletInfo: ref(null),
