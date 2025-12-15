@@ -1,6 +1,7 @@
 # Web3 Dashboard
 
 A multi-chain Web3 wallet dashboard built with Nuxt 4, wagmi, viem, and Reown (WalletConnect).
+Live version on https://web3-dashboard.miksik-jan.workers.dev/
 
 ## Features
 
