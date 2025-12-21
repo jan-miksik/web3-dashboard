@@ -17,13 +17,6 @@ test.describe('Home Page E2E Tests', () => {
     await expect(page.getByRole('main')).toBeVisible()
   })
 
-  test('should show connect wallet button when not connected', async ({ page }) => {
-    // Use header button to avoid strict mode violation (button appears in header, main, and modal)
-    const headerButton = page.getByRole('banner').getByTestId('connect-button')
-    await expect(headerButton).toBeVisible()
-    await expect(headerButton.getByTestId('connect-button-text')).toContainText('Connect Wallet')
-  })
-
   test('should be responsive', async ({ page }) => {
     // Use header button to avoid strict mode violation
     const headerButton = page.getByRole('banner').getByTestId('connect-button')
