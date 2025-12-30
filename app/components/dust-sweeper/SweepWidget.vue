@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useDustSweeper } from '~/composables/useDustSweeper'
 import { useBatchSweeper, BATCH_SUPPORTED_WALLETS } from '~/composables/useBatchSweeper'
 import { useAccount } from '@wagmi/vue'
@@ -40,6 +40,14 @@ watch(address, newAddress => {
 watch(selectedChainId, () => {
   if (address.value) {
     checkBatchingSupport(selectedChainId.value)
+  }
+})
+
+// Cleanup copy timeout on unmount
+onUnmounted(() => {
+  if (copyTimeout) {
+    clearTimeout(copyTimeout)
+    copyTimeout = null
   }
 })
 

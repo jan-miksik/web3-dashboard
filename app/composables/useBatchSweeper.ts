@@ -44,8 +44,6 @@ const ERC20_ABI = [
   },
 ] as const
 
-const MAX_UINT256 = (1n << 256n) - 1n
-
 export function useBatchSweeper() {
   const { getSweepRoute, executeRoute } = useDustSweeper()
   const { data: walletClient } = useConnectorClient()
@@ -303,12 +301,11 @@ export function useBatchSweeper() {
           }
 
           // Switch to the SOURCE chain for these routes (this fixes your revert-on-estimate issue).
-          if (walletClient.value.chain.id !== fromChainId) {
+          if (walletClient.value.chain?.id !== fromChainId) {
             batchStatus.value = `Switching to ${fromChain.name}...`
             await switchChain({ chainId: fromChainId })
             await new Promise(resolve => setTimeout(resolve, 1500))
           }
-
           const publicClient = getPublicClient(config, { chainId: fromChainId })
           if (!publicClient) {
             throw new Error(`No public client available for chain ${fromChainId}`)
@@ -358,7 +355,7 @@ export function useBatchSweeper() {
                   const approveData = encodeFunctionData({
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [swapCall.to, MAX_UINT256],
+                    args: [swapCall.to, fromAmount],
                   })
 
                   calls.push({

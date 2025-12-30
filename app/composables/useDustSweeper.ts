@@ -53,7 +53,10 @@ export function useDustSweeper() {
   const dustTokens = computed(() => {
     return allTokens.value
       .filter(t => t.usdValue > 0 && t.usdValue < dustThreshold.value)
-      .map(t => ({ ...t, selected: false }))
+      .map(t => ({
+        ...t,
+        selected: selectedTokenIds.value.has(`${t.chainId}-${t.address}`),
+      }))
   })
 
   const toggleToken = (token: Token) => {
@@ -131,22 +134,49 @@ export function useDustSweeper() {
       throw new Error('No wallet client')
     }
 
-    console.log('Switching chain if needed...')
-    // Switch chain if needed
-    if (walletClient.value.chain.id !== route.fromChainId) {
-      console.log(`Switching from ${walletClient.value.chain.id} to ${route.fromChainId}`)
-      await switchChain({ chainId: route.fromChainId })
-    }
+    isSweeping.value = true
+    sweepStatus.value = 'Preparing transaction...'
 
-    console.log('Executing LiFi route...')
-    // Execute via LiFi
-    await executeLifiRoute(route, {
-      updateRouteHook: updatedRoute => {
-        logger.info('Route updated', { route: updatedRoute })
-        console.log('Route status update:', updatedRoute.steps[0]?.execution?.status)
-      },
-    })
-    console.log('Route execution finished')
+    try {
+      console.log('Switching chain if needed...')
+      // Switch chain if needed
+      if (walletClient.value.chain.id !== route.fromChainId) {
+        sweepStatus.value = `Switching to chain ${route.fromChainId}...`
+        console.log(`Switching from ${walletClient.value.chain.id} to ${route.fromChainId}`)
+        await switchChain({ chainId: route.fromChainId })
+      }
+
+      sweepStatus.value = 'Executing route...'
+      console.log('Executing LiFi route...')
+      // Execute via LiFi
+      await executeLifiRoute(route, {
+        updateRouteHook: updatedRoute => {
+          logger.info('Route updated', { route: updatedRoute })
+          const executionStatus = updatedRoute.steps[0]?.execution?.status
+          console.log('Route status update:', executionStatus)
+
+          // Update status based on execution state
+          if (executionStatus) {
+            const statusMap: Record<string, string> = {
+              PENDING: 'Transaction pending...',
+              ACTION_REQUIRED: 'Action required in wallet...',
+              CHAIN_SWITCH_REQUIRED: 'Chain switch required...',
+              DONE: 'Transaction complete!',
+              FAILED: 'Transaction failed',
+            }
+            sweepStatus.value = statusMap[executionStatus] || `Status: ${executionStatus}`
+          }
+        },
+      })
+      sweepStatus.value = 'Transaction complete!'
+      console.log('Route execution finished')
+    } catch (error) {
+      logger.error('Route execution failed', error)
+      sweepStatus.value = 'Transaction failed'
+      throw error
+    } finally {
+      isSweeping.value = false
+    }
   }
 
   return {

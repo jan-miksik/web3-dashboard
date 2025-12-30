@@ -15,6 +15,7 @@ const emit = defineEmits<{
 
 const onToggle = (token: DustToken) => {
   toggleToken(token)
+  emit('toggle', token)
 }
 
 const groupedTokens = computed(() => {
@@ -63,7 +64,16 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
 
     <div v-else class="list-wrapper">
       <div class="list-header">
-        <div class="select-all-control" @click="toggleGlobalSelection">
+        <div
+          class="select-all-control"
+          role="checkbox"
+          tabindex="0"
+          :aria-checked="isAllSelected"
+          aria-label="Select all assets"
+          @click="toggleGlobalSelection"
+          @keydown.enter.prevent="toggleGlobalSelection"
+          @keydown.space.prevent="toggleGlobalSelection"
+        >
           <div class="checkbox" :class="{ checked: isAllSelected }">
             <svg v-if="isAllSelected" viewBox="0 0 24 24" class="checkmark">
               <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
@@ -75,7 +85,16 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
 
       <div v-for="(chainTokens, chainName) in groupedTokens" :key="chainName" class="chain-group">
         <div class="chain-header">
-          <div class="chain-title-wrapper" @click="toggleChainSelection(chainTokens)">
+          <div
+            class="chain-title-wrapper"
+            role="checkbox"
+            tabindex="0"
+            :aria-checked="isChainSelected(chainTokens)"
+            :aria-label="`Select all assets on ${chainName}`"
+            @click="toggleChainSelection(chainTokens)"
+            @keydown.enter.prevent="toggleChainSelection(chainTokens)"
+            @keydown.space.prevent="toggleChainSelection(chainTokens)"
+          >
             <div class="checkbox" :class="{ checked: isChainSelected(chainTokens) }">
               <svg v-if="isChainSelected(chainTokens)" viewBox="0 0 24 24" class="checkmark">
                 <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
@@ -107,7 +126,16 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
               </div>
             </div>
             <div class="token-value">${{ token.usdValue.toFixed(2) }}</div>
-            <div class="selection-indicator">
+            <div
+              class="selection-indicator"
+              role="checkbox"
+              tabindex="0"
+              :aria-checked="selectedIds.has(`${token.chainId}-${token.address}`)"
+              :aria-label="`Select ${token.symbol} on ${chainName}`"
+              @click.stop="onToggle(token)"
+              @keydown.enter.stop.prevent="onToggle(token)"
+              @keydown.space.stop.prevent="onToggle(token)"
+            >
               <div
                 class="checkbox"
                 :class="{ checked: selectedIds.has(`${token.chainId}-${token.address}`) }"
@@ -165,6 +193,20 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
   font-weight: 600;
   color: var(--text-primary);
   user-select: none;
+}
+
+.select-all-control:focus-visible,
+.chain-title-wrapper:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.select-all-control:focus-visible .checkbox,
+.chain-title-wrapper:focus-visible .checkbox,
+.selection-indicator:focus-visible .checkbox {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
 }
 
 .chain-group {
@@ -297,6 +339,10 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
   position: absolute;
   top: 8px;
   right: 8px;
+}
+
+.selection-indicator {
+  border-radius: 6px;
 }
 
 .checkbox {
