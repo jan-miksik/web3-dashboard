@@ -3,8 +3,7 @@ import { useDustSweeper } from '~/composables/useDustSweeper'
 import TokenList from '~/components/dust-sweeper/TokenList.vue'
 import SweepWidget from '~/components/dust-sweeper/SweepWidget.vue'
 
-const { dustTokens, isLoadingTokens, dustThreshold, selectedTokenIds, toggleToken } =
-  useDustSweeper()
+const { dustTokens, isLoadingTokens, dustThreshold, selectedTokenIds } = useDustSweeper()
 </script>
 
 <template>
@@ -40,7 +39,7 @@ const { dustTokens, isLoadingTokens, dustThreshold, selectedTokenIds, toggleToke
 
     <div v-else class="content-grid">
       <div class="left-col">
-        <TokenList :tokens="dustTokens" :selected-ids="selectedTokenIds" @toggle="toggleToken" />
+        <TokenList :tokens="dustTokens" :selected-ids="selectedTokenIds" />
       </div>
       <div class="right-col">
         <SweepWidget />
