@@ -2,12 +2,12 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useDustSweeper } from '~/composables/useDustSweeper'
 import { useBatchSweeper, BATCH_SUPPORTED_WALLETS } from '~/composables/useBatchSweeper'
-import { useAccount } from '@wagmi/vue'
+import { useConnection } from '@wagmi/vue'
 import { CHAIN_METADATA } from '~/utils/chains'
 import { getUSDCAddress, getGasTokenName } from '~/utils/tokenAddresses'
 import { handleError } from '~/utils/error-handler'
 
-const { address } = useAccount()
+const { address } = useConnection()
 
 const { selectedDustTokens, getSweepRoute, executeRoute, isSweeping, sweepStatus, refetchTokens } =
   useDustSweeper()
@@ -18,27 +18,41 @@ const {
   supportsBatching,
   isCheckingSupport,
   checkBatchingSupport,
+  batchMethod,
 } = useBatchSweeper()
 
-const selectedChainId = ref(8453) // Base
+const selectedChainId = ref<number | null>(null)
 const selectedTokenSymbol = ref<'ETH' | 'USDC'>('ETH')
 const useBatching = ref(true)
 
+// Auto-set chain ID to first selected token's chain when first token is selected
+watch(selectedDustTokens, (newTokens, oldTokens) => {
+  // Only set if chainId is null and we're selecting the first token
+  if (
+    selectedChainId.value === null &&
+    newTokens.length === 1 &&
+    (oldTokens?.length ?? 0) === 0 &&
+    newTokens[0]
+  ) {
+    selectedChainId.value = newTokens[0].chainId
+  }
+})
+
 // Check batching support on mount and when wallet connects
 onMounted(() => {
-  if (address.value) {
+  if (address.value && selectedChainId.value !== null) {
     checkBatchingSupport(selectedChainId.value)
   }
 })
 
 watch(address, newAddress => {
-  if (newAddress) {
+  if (newAddress && selectedChainId.value !== null) {
     checkBatchingSupport(selectedChainId.value)
   }
 })
 
 watch(selectedChainId, () => {
-  if (address.value) {
+  if (address.value && selectedChainId.value !== null) {
     checkBatchingSupport(selectedChainId.value)
   }
 })
@@ -68,18 +82,41 @@ const totalValue = computed(() => {
 
 // Get gas token name for selected chain
 const gasTokenName = computed(() => {
+  if (selectedChainId.value === null) return 'ETH'
   return getGasTokenName(selectedChainId.value)
 })
 
 // Get USDC address for selected chain
 const usdcAddress = computed(() => {
+  if (selectedChainId.value === null) return '0x0000000000000000000000000000000000000000'
   return getUSDCAddress(selectedChainId.value)
 })
 
+// Button text based on batch method
+const sweepButtonText = computed(() => {
+  if (isCheckingSupport.value) return 'Checking wallet...'
+  if (isSweeping.value) return sweepStatus.value
+  if (isBatching.value) return batchStatus.value
+
+  if (!supportsBatching.value || !useBatching.value) {
+    return 'Sweep Dust'
+  }
+
+  if (selectedDustTokens.value.length < 2) {
+    return 'Sweep Dust'
+  }
+
+  if (batchMethod.value === 'eip7702') {
+    return '⚡ One-Click Sweep'
+  }
+
+  return 'Batch Sweep'
+})
+
 // Shorten address function (same as in tokens table)
-function shortenAddress(address: string): string {
-  if (!address) return ''
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
+function shortenAddress(addr: string): string {
+  if (!addr) return ''
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
 
 // Copy functionality
@@ -110,6 +147,14 @@ async function copyAddress() {
 }
 
 const onSweep = async () => {
+  if (selectedChainId.value === null) {
+    handleError(new Error('Please select a target chain'), {
+      message: 'Target chain is required',
+      showNotification: true,
+    })
+    return
+  }
+
   if (useBatching.value) {
     try {
       await executeBatchSweep(
@@ -133,12 +178,7 @@ const onSweep = async () => {
     return
   }
 
-  // Basic implementation: Loop through selected tokens and execute one by one (or batch if possible)
-  // LiFi supports 'ContractCalls' for batching but usually requires a smart wallet or efficient routing.
-  // For MVP with EOA, we will iterate. Ideally we'd group by chain and batch there.
-  // "Sweeper" implies batching.
-  // CURRENT LIMITATION: EOA requires 1 sign per tx unless using 4337 or similar.
-  // We will sequentially execute for now to demonstrate the flow.
+  // Basic implementation: Loop through selected tokens and execute one by one
   isSweeping.value = true
   console.log('Starting sweep process...')
 
@@ -197,6 +237,7 @@ const onSweep = async () => {
       <div class="control-group">
         <label>Target Chain</label>
         <select v-model="selectedChainId">
+          <option :value="null">Select a chain</option>
           <option v-for="c in targetChains" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
       </div>
@@ -275,7 +316,7 @@ const onSweep = async () => {
         <div v-else-if="supportsBatching" class="checkbox-group">
           <label>
             <input v-model="useBatching" type="checkbox" />
-            <span>Batch Transaction</span>
+            <span>{{ batchMethod === 'eip7702' ? 'One-Click Mode' : 'Batch Transaction' }}</span>
           </label>
         </div>
       </div>
@@ -283,11 +324,7 @@ const onSweep = async () => {
       <div v-if="showBatchingInfo" class="info-message">
         <div class="info-icon">ℹ️</div>
         <div class="info-content">
-          <strong>Sequential Sweeping Mode</strong>
-          <p>
-            Your wallet doesn't support batch transactions. Transactions will be executed one by
-            one.
-          </p>
+          <strong>Sweeping one-by-one Mode</strong>
           <p class="info-suggestion">
             For faster batch transactions, consider using:
             <span
@@ -296,7 +333,7 @@ const onSweep = async () => {
               class="wallet-link"
             >
               <a :href="wallet.url" target="_blank" rel="noopener noreferrer">{{ wallet.name }}</a
-              >{{ index < BATCH_SUPPORTED_WALLETS.length - 1 ? ',' : '' }}
+              >{{ index < BATCH_SUPPORTED_WALLETS.length - 1 ? ', ' : '' }}
             </span>
           </p>
         </div>
@@ -304,21 +341,17 @@ const onSweep = async () => {
 
       <button
         class="sweep-btn"
-        :disabled="selectedDustTokens.length === 0 || isSweeping || isBatching || isCheckingSupport"
+        :disabled="
+          selectedDustTokens.length === 0 ||
+          selectedChainId === null ||
+          isSweeping ||
+          isBatching ||
+          isCheckingSupport
+        "
         @click="onSweep"
       >
         <span v-if="isSweeping || isBatching || isCheckingSupport" class="spinner-sm"></span>
-        {{
-          isCheckingSupport
-            ? 'Checking wallet...'
-            : isSweeping
-              ? sweepStatus
-              : isBatching
-                ? batchStatus
-                : supportsBatching && useBatching && selectedDustTokens.length >= 2
-                  ? 'Batch Sweep'
-                  : 'Sweep Dust'
-        }}
+        {{ sweepButtonText }}
       </button>
     </div>
   </div>
@@ -442,18 +475,6 @@ select {
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-}
-
-.sequential-mode {
-  display: flex;
-  align-items: center;
-}
-
-.sequential-mode label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  cursor: default;
 }
 
 .spinner-sm {

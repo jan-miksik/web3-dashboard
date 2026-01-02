@@ -15,7 +15,14 @@ const props = defineProps<Props>()
 </script>
 
 <template>
-  <tr class="token-row" :class="{ 'low-value-row': token.usdValue < 5 }" data-testid="token-row">
+  <tr
+    class="token-row"
+    :class="{
+      'low-value-row': token.usdValue < 5,
+      'native-token-row': token.tokenType === 'native',
+    }"
+    data-testid="token-row"
+  >
     <td class="td-token">
       <div class="token-info">
         <div class="token-logo">
@@ -119,6 +126,21 @@ const props = defineProps<Props>()
 
 .token-row:hover {
   background: var(--bg-hover);
+}
+
+/* Native Token Styling - Strong background to distinguish gas tokens */
+.token-row.native-token-row {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%);
+  border-left: 3px solid rgba(14, 165, 233, 0.3);
+}
+
+.token-row.native-token-row:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14) 0%, rgba(14, 165, 233, 0.08) 100%);
+  border-left-color: rgba(14, 165, 233, 0.45);
+}
+
+.token-row.native-token-row td {
+  border-left: none;
 }
 
 .token-row td {

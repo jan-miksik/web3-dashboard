@@ -29,19 +29,6 @@ const groupedTokens = computed(() => {
   return groups
 })
 
-const isAllSelected = computed(() => {
-  if (props.tokens.length === 0) return false
-  return props.tokens.every(t => props.selectedIds.has(`${t.chainId}-${t.address}`))
-})
-
-const toggleGlobalSelection = () => {
-  if (isAllSelected.value) {
-    deselectTokens(props.tokens)
-  } else {
-    selectTokens(props.tokens)
-  }
-}
-
 const isChainSelected = (chainTokens: DustToken[]) => {
   if (chainTokens.length === 0) return false
   return chainTokens.every(t => props.selectedIds.has(`${t.chainId}-${t.address}`))
@@ -63,26 +50,6 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
     </div>
 
     <div v-else class="list-wrapper">
-      <div class="list-header">
-        <div
-          class="select-all-control"
-          role="checkbox"
-          tabindex="0"
-          :aria-checked="isAllSelected"
-          aria-label="Select all assets"
-          @click="toggleGlobalSelection"
-          @keydown.enter.prevent="toggleGlobalSelection"
-          @keydown.space.prevent="toggleGlobalSelection"
-        >
-          <div class="checkbox" :class="{ checked: isAllSelected }">
-            <svg v-if="isAllSelected" viewBox="0 0 24 24" class="checkmark">
-              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-            </svg>
-          </div>
-          <span>Select All Assets</span>
-        </div>
-      </div>
-
       <div v-for="(chainTokens, chainName) in groupedTokens" :key="chainName" class="chain-group">
         <div class="chain-header">
           <div
@@ -177,32 +144,12 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
   gap: 24px;
 }
 
-.list-header {
-  display: flex;
-  justify-content: flex-end;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.select-all-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  user-select: none;
-}
-
-.select-all-control:focus-visible,
 .chain-title-wrapper:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 3px;
   border-radius: 8px;
 }
 
-.select-all-control:focus-visible .checkbox,
 .chain-title-wrapper:focus-visible .checkbox,
 .selection-indicator:focus-visible .checkbox {
   border-color: var(--primary-color);
@@ -267,13 +214,26 @@ const toggleChainSelection = (chainTokens: DustToken[]) => {
 
 /* Native Token Styling */
 .token-card.native {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(var(--primary-rgb), 0.05) 100%);
-  border-style: dashed;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(14, 165, 233, 0.06) 100%);
+  border: 2px solid rgba(14, 165, 233, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(14, 165, 233, 0.05),
+    0 2px 8px rgba(14, 165, 233, 0.08);
+}
+
+.token-card.native:hover {
+  border-color: rgba(14, 165, 233, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(14, 165, 233, 0.1),
+    0 4px 12px rgba(14, 165, 233, 0.12);
 }
 
 .token-card.native.selected {
-  background: rgba(var(--primary-rgb), 0.15);
-  border-style: solid;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(14, 165, 233, 0.12) 100%);
+  border-color: rgba(14, 165, 233, 0.5);
+  box-shadow:
+    0 0 0 2px rgba(14, 165, 233, 0.15),
+    0 4px 16px rgba(14, 165, 233, 0.15);
 }
 
 .native-badge {

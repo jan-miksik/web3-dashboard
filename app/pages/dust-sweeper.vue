@@ -21,9 +21,7 @@ const { dustTokens, isLoadingTokens, dustThreshold, selectedTokenIds } = useDust
 
     <div class="page-header">
       <h1 class="title">Dust Sweeper</h1>
-      <p class="subtitle">
-        Sweep your crypto dust into clean assets. Minimally invasive, maximally efficient.
-      </p>
+      <p class="subtitle">Sweep your crypto dust into clean assets.</p>
     </div>
 
     <div class="threshold-control">
