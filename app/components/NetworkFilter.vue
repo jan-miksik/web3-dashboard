@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
+import { formatUsdValueParts } from '~/utils/format'
 
 interface Props {
   chainsWithAssets: ChainMetadata[]
@@ -11,9 +12,11 @@ interface Props {
   isChainSelected: (chainId: number) => boolean
   onToggleChain: (chainId: number) => void
   onClickAllNetworks: () => void
+  allNetworksLabel?: string
+  chainBalances?: Record<number, number>
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const chainFilterRef = ref<HTMLElement | null>(null)
 
@@ -39,6 +42,12 @@ onUnmounted(() => {
     window.removeEventListener('click', handleClickOutside)
   }
 })
+
+const formatBalance = (val: number | undefined) => {
+  if (val === undefined || val === 0) return ''
+  const parts = formatUsdValueParts(val)
+  return `${parts.main}${parts.extra || ''}`
+}
 </script>
 
 <template>
@@ -67,7 +76,7 @@ onUnmounted(() => {
           :class="{ selected: selectedChainIds.size === 0 }"
           @click="onClickAllNetworks"
         >
-          <span class="option-name">All Networks</span>
+          <span class="option-name">{{ allNetworksLabel ?? 'All Networks' }}</span>
           <span v-if="selectedChainIds.size === 0" class="checkmark">✓</span>
         </button>
         <!-- Chains with assets -->
@@ -90,6 +99,9 @@ onUnmounted(() => {
             <span class="option-name">{{ chain.name }}</span>
           </div>
           <div class="option-right">
+            <span v-if="chainBalances?.[chain.id]" class="chain-balance">
+              {{ formatBalance(chainBalances[chain.id]) }}
+            </span>
             <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
           </div>
         </button>
@@ -137,6 +149,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  width: 100%;
+  justify-content: space-between;
 }
 
 .network-filter-btn:hover {
@@ -180,7 +194,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 4px;
-  min-width: 200px;
+  min-width: 220px;
 }
 
 @media (min-width: 1024px) {
@@ -220,6 +234,18 @@ onUnmounted(() => {
 .filter-option.selected .option-name {
   color: var(--accent-primary);
   font-weight: 600;
+}
+
+.chain-balance {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.filter-option.selected .chain-balance {
+  color: var(--accent-primary);
+  opacity: 0.8;
 }
 
 .filter-option-no-assets {

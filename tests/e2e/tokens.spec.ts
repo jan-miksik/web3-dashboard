@@ -137,19 +137,10 @@ test.describe('Token Display E2E Tests', () => {
         const usdValueText = await usdValueElement.textContent()
         expect(usdValueText).toBeTruthy()
 
-        // Parse USD value text to numeric value
-        // Handle formats like: "$1,234.56", "<$0.01", "$0.00"
-        let numericValue = 0
-        if (usdValueText) {
-          // Handle "<$0.01" case - treat as 0.005 (midpoint between 0 and 0.01)
-          if (usdValueText.trim().startsWith('<')) {
-            numericValue = 0.005
-          } else {
-            // Remove currency symbols, commas, and whitespace
-            const cleaned = usdValueText.replace(/[$,\s]/g, '')
-            numericValue = parseFloat(cleaned) || 0
-          }
-        }
+        // Parse USD value text to numeric value (supports extended decimals like "$0.000123")
+        const numericValue = usdValueText
+          ? parseFloat(usdValueText.replace(/[^0-9.]/g, '')) || 0
+          : 0
 
         usdValues.push(numericValue)
       }

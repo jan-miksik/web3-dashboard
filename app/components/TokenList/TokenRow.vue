@@ -1,17 +1,21 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Token } from '~/composables/useTokens'
+import type { UsdDisplay } from '~/utils/format'
 
 interface Props {
   token: Token
   copiedAddress: string | null
   onCopyAddress: (address: string) => void
   onShortenAddress: (address: string) => string
-  onFormatUsdValue: (value: number) => string
+  onFormatUsdValueExpanded: (value: number) => UsdDisplay
   onFormatBalance: (balance: string) => string
   onGetChainIcon: (chainId: number) => string | undefined
 }
 
 const props = defineProps<Props>()
+
+const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usdValue))
 </script>
 
 <template>
@@ -36,7 +40,10 @@ const props = defineProps<Props>()
         </div>
         <div class="token-details">
           <div class="token-symbol-row">
-            <span class="token-symbol">{{ token.symbol }}</span>
+            <span class="token-symbol">
+              {{ token.symbol }}
+              <span v-if="token.tokenType === 'native'" class="native-badge">NATIVE</span>
+            </span>
             <button
               v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
               class="token-address-btn"
@@ -111,7 +118,8 @@ const props = defineProps<Props>()
     <td class="td-value">
       <div class="value-container">
         <span class="token-value usd-value" :class="{ 'has-value': token.usdValue > 0 }">
-          {{ onFormatUsdValue(token.usdValue) }}
+          {{ usdDisplay.main }}
+          <span v-if="usdDisplay.extra" class="usd-sub-decimals">{{ usdDisplay.extra }}</span>
         </span>
         <span class="balance-value">{{ onFormatBalance(token.formattedBalance) }}</span>
       </div>
@@ -126,21 +134,6 @@ const props = defineProps<Props>()
 
 .token-row:hover {
   background: var(--bg-hover);
-}
-
-/* Native Token Styling - Strong background to distinguish gas tokens */
-.token-row.native-token-row {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%);
-  border-left: 3px solid rgba(14, 165, 233, 0.3);
-}
-
-.token-row.native-token-row:hover {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14) 0%, rgba(14, 165, 233, 0.08) 100%);
-  border-left-color: rgba(14, 165, 233, 0.45);
-}
-
-.token-row.native-token-row td {
-  border-left: none;
 }
 
 .token-row td {
@@ -214,6 +207,18 @@ const props = defineProps<Props>()
   font-weight: 600;
   color: var(--text-primary);
   font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.native-badge {
+  font-size: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: 700;
 }
 
 .token-address-btn {
@@ -306,6 +311,9 @@ const props = defineProps<Props>()
 }
 
 .usd-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text-secondary);
@@ -315,6 +323,12 @@ const props = defineProps<Props>()
 
 .usd-value.has-value {
   color: var(--success);
+}
+
+.usd-sub-decimals {
+  color: var(--text-muted);
+  opacity: 0.8;
+  font-size: 0.9em;
 }
 
 .balance-value {

@@ -61,40 +61,6 @@ const BATCH_EXECUTOR_ABI = [
   },
 ] as const
 
-// ERC20 ABI for approve calls (reserved for future use)
-const _ERC20_ABI = [
-  {
-    type: 'function',
-    name: 'approve',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'allowance',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'transfer',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-] as const
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -126,7 +92,7 @@ export interface BatchTransactionResult {
 }
 
 // ============================================================================
-// EIP-5792 Version Detection (same logic from useBatchSweeper)
+// EIP-5792 Version Detection
 // ============================================================================
 
 const PREFERRED_SEND_CALLS_VERSIONS = ['2.0.0', '1.0.0', '1.0'] as const
@@ -396,7 +362,7 @@ export function useBatchTransaction() {
 
   /**
    * Checks if wallet supports EIP-5792 batching (wallet_sendCalls).
-   * Reuses logic from the existing useBatchSweeper.
+   * Probes `wallet_getCapabilities` first, then falls back to `wallet_sendCalls` version probing.
    */
   const checkEIP5792Support = async (
     targetChainId?: number
@@ -733,6 +699,7 @@ export function useBatchTransaction() {
       domain: {
         name: 'Authorization',
         version: '1',
+        chainId: authorizationData.chainId,
       },
       types: {
         Authorization: [
@@ -753,7 +720,8 @@ export function useBatchTransaction() {
     const r = signature.slice(0, 66) as Hex
     const s = `0x${signature.slice(66, 130)}` as Hex
     const v = parseInt(signature.slice(130, 132), 16)
-    const yParity = v === 27 ? 0 : 1
+    // Normalize v to yParity: handle both legacy (27/28) and modern (0/1) signatures
+    const yParity = v === 0 || v === 1 ? v : v === 27 ? 0 : 1
 
     return {
       chainId: Number(authorizationData.chainId),

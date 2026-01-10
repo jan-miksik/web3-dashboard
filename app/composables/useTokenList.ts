@@ -5,6 +5,7 @@ import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
 import { handleError } from '~/utils/error-handler'
+import { formatUsdValueParts, formatUsdValueString } from '~/utils/format'
 
 const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
   return CHAIN_METADATA.filter(chain => chainIds.has(chain.id))
@@ -190,14 +191,11 @@ export function useTokenList() {
   }
 
   function formatUsdValue(value: number): string {
-    if (value === 0) return '$0.00'
-    if (value < 0.01) return '<$0.01'
-    return value.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
+    return formatUsdValueString(value)
+  }
+
+  function formatUsdValueExpanded(value: number) {
+    return formatUsdValueParts(value)
   }
 
   function formatTotalValue(value: number): string {
@@ -244,6 +242,7 @@ export function useTokenList() {
     // Formatting
     formatBalance,
     formatUsdValue,
+    formatUsdValueExpanded,
     formatTotalValue,
   }
 }

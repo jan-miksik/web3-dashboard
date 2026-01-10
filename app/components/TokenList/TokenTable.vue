@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Token } from '~/composables/useTokens'
+import type { UsdDisplay } from '~/utils/format'
+
 import TokenRow from './TokenRow.vue'
 
 interface Props {
@@ -13,7 +15,7 @@ interface Props {
   copiedAddress: string | null
   onCopyAddress: (address: string) => void
   onShortenAddress: (address: string) => string
-  onFormatUsdValue: (value: number) => string
+  onFormatUsdValueExpanded: (value: number) => UsdDisplay
   onFormatBalance: (balance: string) => string
   onGetChainIcon: (chainId: number) => string | undefined
 }
@@ -45,7 +47,7 @@ const emit = defineEmits<{
           :copied-address="copiedAddress"
           :on-copy-address="onCopyAddress"
           :on-shorten-address="onShortenAddress"
-          :on-format-usd-value="onFormatUsdValue"
+          :on-format-usd-value-expanded="onFormatUsdValueExpanded"
           :on-format-balance="onFormatBalance"
           :on-get-chain-icon="onGetChainIcon"
         />
@@ -83,7 +85,7 @@ const emit = defineEmits<{
             :copied-address="copiedAddress"
             :on-copy-address="onCopyAddress"
             :on-shorten-address="onShortenAddress"
-            :on-format-usd-value="onFormatUsdValue"
+            :on-format-usd-value-expanded="onFormatUsdValueExpanded"
             :on-format-balance="onFormatBalance"
             :on-get-chain-icon="onGetChainIcon"
             :style="{ '--row-index': index }"

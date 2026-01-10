@@ -8,6 +8,7 @@ import TokenTable from '../../../app/components/TokenList/TokenTable.vue'
 import TokenRow from '../../../app/components/TokenList/TokenRow.vue'
 import NetworkFilter from '../../../app/components/NetworkFilter.vue'
 import { useConnection } from '@wagmi/vue'
+import { formatUsdValueParts, formatUsdValueString } from '../../../app/utils/format'
 
 const mockTokens = ref<any[]>([])
 const mockIsLoading = ref(false)
@@ -114,16 +115,8 @@ vi.mock('../../../app/composables/useTokenList', () => ({
 
       // Formatting
       formatBalance: (balance: string) => balance,
-      formatUsdValue: (value: number) => {
-        if (value === 0) return '$0.00'
-        if (value < 0.01) return '<$0.01'
-        return value.toLocaleString('en-US', {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      },
+      formatUsdValue: (value: number) => formatUsdValueString(value),
+      formatUsdValueExpanded: (value: number) => formatUsdValueParts(value),
       formatTotalValue: (value: number) =>
         value.toLocaleString('en-US', {
           style: 'currency',

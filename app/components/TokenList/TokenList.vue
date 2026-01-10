@@ -36,6 +36,7 @@ const {
   // Formatting
   formatBalance,
   formatUsdValue,
+  formatUsdValueExpanded,
   formatTotalValue,
 } = useTokenList()
 </script>
@@ -83,7 +84,7 @@ const {
       :copied-address="copiedAddress"
       :on-copy-address="copyTokenAddress"
       :on-shorten-address="shortenAddress"
-      :on-format-usd-value="formatUsdValue"
+      :on-format-usd-value-expanded="formatUsdValueExpanded"
       :on-format-balance="formatBalance"
       :on-get-chain-icon="getChainIcon"
       @update:show-low-value-assets="showLowValueAssets = $event"
