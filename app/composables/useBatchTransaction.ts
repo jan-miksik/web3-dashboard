@@ -1,5 +1,5 @@
 import { ref, watch, computed } from 'vue'
-import { useConnectorClient, useAccount, useConfig } from '@wagmi/vue'
+import { useConnectorClient, useConnection, useConfig } from '@wagmi/vue'
 import { getPublicClient, getWalletClient } from '@wagmi/core'
 import { encodeFunctionData, type Address, type Hex, type Chain } from 'viem'
 import { sendCalls, getCapabilities } from 'viem/actions'
@@ -75,12 +75,24 @@ export type WalletType = 'eoa' | 'smart_contract' | 'unknown'
 
 export type BatchMethod = 'eip7702' | 'eip5792' | 'sequential' | 'none'
 
+export type WalletProvider = 'metamask' | 'rabby' | 'coinbase' | 'unknown'
+
+// Wallet-specific batch limits (max transactions per batch)
+export const WALLET_BATCH_LIMITS: Record<WalletProvider, number> = {
+  metamask: 10, // MetaMask has a hard limit of 10 calls per batch
+  rabby: 100, // Rabby has a higher limit
+  coinbase: 50, // Coinbase Smart Wallet
+  unknown: 10, // Safe default matching strictest limit (MetaMask)
+}
+
 export interface BatchCapabilities {
   walletType: WalletType
+  walletProvider: WalletProvider
   supportsEIP7702: boolean
   supportsEIP5792: boolean
   preferredMethod: BatchMethod
   sendCallsVersion: string | null
+  maxBatchSize: number
 }
 
 export interface BatchTransactionResult {
@@ -103,43 +115,108 @@ const PREFERRED_SEND_CALLS_VERSIONS = ['2.0.0', '1.0.0', '1.0'] as const
 
 export function useBatchTransaction() {
   const { data: walletClient } = useConnectorClient()
-  const { address, chainId } = useAccount()
+  const { address, chainId } = useConnection()
   const config = useConfig()
-
-  // #region agent log
-  const __agentLog = (
-    hypothesisId: string,
-    location: string,
-    message: string,
-    data: Record<string, unknown>
-  ) => {
-    const addr = address.value
-    const addrSuffix = typeof addr === 'string' && addr.length >= 6 ? addr.slice(-6) : null
-    const p = fetch('http://127.0.0.1:7242/ingest/a8fe3ba7-9e8e-4e50-a07f-d2b5a0c733d9', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        message,
-        data: { ...data, addrSuffix },
-        timestamp: Date.now(),
-      }),
-    })
-    // Some test environments stub `fetch` to a non-Promise return; guard to avoid throwing.
-    ;(p as any)?.catch?.(() => {})
-  }
-  // #endregion agent log
 
   // State
   const isDetecting = ref(false)
   const walletType = ref<WalletType>('unknown')
+  const walletProvider = ref<WalletProvider>('unknown')
   const capabilities = ref<BatchCapabilities | null>(null)
   const isPending = ref(false)
   const status = ref('')
   const error = ref<Error | null>(null)
+
+  // ============================================================================
+  // Wallet Provider Detection
+  // ============================================================================
+
+  /**
+   * Detects the wallet provider (MetaMask, Rabby, etc.)
+   * This is important for knowing batch size limits.
+   */
+  const detectWalletProvider = (): WalletProvider => {
+    if (!walletClient.value) return 'unknown'
+
+    try {
+      // Check connector info first (most reliable)
+      const connector = (walletClient.value as any).connector
+      const connectorName = String(connector?.name ?? '').toLowerCase()
+      const connectorId = String(connector?.id ?? '').toLowerCase()
+
+      // Try to get provider from walletClient (more reliable than window.ethereum)
+      const provider = (walletClient.value as any).transport?.value?.provider
+      const providerIsMetaMask = provider?.isMetaMask === true
+      const providerIsRabby = provider?.isRabby === true
+      const providerIsCoinbase = provider?.isCoinbaseWallet === true
+
+      // Also check window.ethereum flags
+      const win = typeof window !== 'undefined' ? (window as any) : null
+      const windowIsMetaMask = win?.ethereum?.isMetaMask === true
+      const windowIsRabby = win?.ethereum?.isRabby === true
+      const windowIsCoinbase = win?.ethereum?.isCoinbaseWallet === true
+
+      logger.info('Wallet provider detection', {
+        connectorName,
+        connectorId,
+        providerIsMetaMask,
+        providerIsRabby,
+        providerIsCoinbase,
+        windowIsMetaMask,
+        windowIsRabby,
+        windowIsCoinbase,
+      })
+
+      // MetaMask detection - check multiple sources
+      if (
+        connectorName.includes('metamask') ||
+        connectorId.includes('metamask') ||
+        connectorId === 'io.metamask' ||
+        providerIsMetaMask
+      ) {
+        return 'metamask'
+      }
+
+      // For 'injected' connector, check window.ethereum
+      // Note: Only use window.ethereum if provider check didn't work
+      if (connectorId === 'injected' && windowIsMetaMask && !windowIsRabby) {
+        return 'metamask'
+      }
+
+      // Rabby detection
+      if (
+        connectorName.includes('rabby') ||
+        connectorId.includes('rabby') ||
+        connectorId === 'io.rabby' ||
+        providerIsRabby ||
+        windowIsRabby
+      ) {
+        return 'rabby'
+      }
+
+      // Coinbase Wallet detection
+      if (
+        connectorName.includes('coinbase') ||
+        connectorId.includes('coinbase') ||
+        providerIsCoinbase ||
+        windowIsCoinbase
+      ) {
+        return 'coinbase'
+      }
+
+      // If still unknown but using injected connector, default to conservative limit
+      // Better to split more than fail
+      if (connectorId === 'injected') {
+        logger.warn('Unknown injected wallet, using conservative batch limit')
+        return 'unknown'
+      }
+
+      return 'unknown'
+    } catch (e) {
+      logger.warn('Failed to detect wallet provider', { error: e })
+      return 'unknown'
+    }
+  }
 
   // ============================================================================
   // Wallet Type Detection
@@ -158,20 +235,10 @@ export function useBatchTransaction() {
 
     try {
       const code = await pc.getCode({ address: address.value })
-      // #region agent log
+      // EIP-7702 delegation designator is expected to start with 0xef0100 (then 20-byte address)
       const codeHex = typeof code === 'string' ? code : ''
       const codeNo0x = codeHex.startsWith('0x') ? codeHex.slice(2) : codeHex
-      const codePrefix = codeHex.slice(0, 12)
-      const codeLen = codeHex.length
-      // EIP-7702 delegation designator is expected to start with 0xef0100 (then 20-byte address)
       const looksLike7702Delegation = codeNo0x.toLowerCase().startsWith('ef0100')
-      __agentLog('A', 'useBatchTransaction.ts:detectWalletType', 'getCode result', {
-        chainId: chainId.value ?? null,
-        codePrefix,
-        codeLen,
-        looksLike7702Delegation,
-      })
-      // #endregion agent log
 
       // If no code, it's a pure EOA
       if (!code || code === '0x') {
@@ -181,14 +248,6 @@ export function useBatchTransaction() {
       // IMPORTANT: EIP-7702 adds a delegation designator as the account "code".
       // This is still an EOA and must be treated as such for batching logic.
       if (looksLike7702Delegation) {
-        // #region agent log
-        __agentLog(
-          'A',
-          'useBatchTransaction.ts:detectWalletType',
-          'classified as EOA due to EIP-7702 delegation designator',
-          { chainId: chainId.value ?? null }
-        )
-        // #endregion agent log
         return 'eoa'
       }
 
@@ -207,13 +266,6 @@ export function useBatchTransaction() {
       return 'smart_contract'
     } catch (e) {
       logger.warn('Failed to detect wallet type', { error: e })
-      // #region agent log
-      __agentLog('B', 'useBatchTransaction.ts:detectWalletType', 'getCode threw', {
-        chainId: chainId.value ?? null,
-        errorName: (e as any)?.name ?? null,
-        errorMessage: String((e as any)?.message ?? ''),
-      })
-      // #endregion agent log
       return 'unknown'
     }
   }
@@ -253,7 +305,6 @@ export function useBatchTransaction() {
         })
 
         logger.info('Wallet capabilities for EIP-7702 check', { capabilities: caps })
-        console.log('Full wallet capabilities:', JSON.stringify(caps, null, 2))
 
         if (caps && typeof caps === 'object') {
           // Check all chains for EIP-7702/delegation support
@@ -274,18 +325,6 @@ export function useBatchTransaction() {
         }
       } catch (capError) {
         logger.warn('wallet_getCapabilities failed for EIP-7702 check', { error: capError })
-        // #region agent log
-        __agentLog(
-          'D',
-          'useBatchTransaction.ts:checkEIP7702Support',
-          'wallet_getCapabilities failed',
-          {
-            errorName: (capError as any)?.name ?? null,
-            errorCode: (capError as any)?.code ?? null,
-            errorMessage: String((capError as any)?.message ?? ''),
-          }
-        )
-        // #endregion agent log
       }
 
       // Method 4: Try to call wallet_signAuthorization to probe support
@@ -296,14 +335,6 @@ export function useBatchTransaction() {
           params: [],
         })
         // If we get here without "method not found", method exists
-        // #region agent log
-        __agentLog(
-          'C',
-          'useBatchTransaction.ts:checkEIP7702Support',
-          'wallet_signAuthorization probe: method exists',
-          {}
-        )
-        // #endregion agent log
         return true
       } catch (probeError: any) {
         const code = probeError?.code
@@ -312,14 +343,6 @@ export function useBatchTransaction() {
         // -32601 = method not found
         if (code === -32601 || msg.includes('method not found') || msg.includes('not supported')) {
           logger.info('wallet_signAuthorization not available')
-          // #region agent log
-          __agentLog(
-            'C',
-            'useBatchTransaction.ts:checkEIP7702Support',
-            'wallet_signAuthorization probe: not available',
-            { errorCode: code ?? null, errorMessage: String(probeError?.message ?? '') }
-          )
-          // #endregion agent log
           return false
         }
 
@@ -331,14 +354,6 @@ export function useBatchTransaction() {
           msg.includes('params')
         ) {
           logger.info('EIP-7702 supported (wallet_signAuthorization method exists)')
-          // #region agent log
-          __agentLog(
-            'C',
-            'useBatchTransaction.ts:checkEIP7702Support',
-            'wallet_signAuthorization probe: params-invalid => exists',
-            { errorCode: code ?? null, errorMessage: String(probeError?.message ?? '') }
-          )
-          // #endregion agent log
           return true
         }
       }
@@ -346,12 +361,6 @@ export function useBatchTransaction() {
       return false
     } catch (e) {
       logger.warn('Failed to check EIP-7702 support', { error: e })
-      // #region agent log
-      __agentLog('D', 'useBatchTransaction.ts:checkEIP7702Support', 'unexpected error', {
-        errorName: (e as any)?.name ?? null,
-        errorMessage: String((e as any)?.message ?? ''),
-      })
-      // #endregion agent log
       return false
     }
   }
@@ -368,20 +377,14 @@ export function useBatchTransaction() {
     targetChainId?: number
   ): Promise<{ supported: boolean; version: string | null }> => {
     if (!walletClient.value || !address.value) {
-      console.log('[BatchTransaction] EIP-5792 check: No wallet client or address')
       return { supported: false, version: null }
     }
 
     try {
-      console.log('[BatchTransaction] Calling getCapabilities for EIP-5792...')
       const caps = await getCapabilities(walletClient.value, {
         account: address.value,
       })
 
-      console.log(
-        '[BatchTransaction] EIP-5792 capabilities received:',
-        JSON.stringify(caps, null, 2)
-      )
       logger.info('EIP-5792 capabilities', { capabilities: caps })
 
       const chainToCheck = targetChainId ?? chainId.value
@@ -397,25 +400,14 @@ export function useBatchTransaction() {
       }
 
       // Fallback: probe for sendCalls support
-      console.log('[BatchTransaction] No chain capability found, probing sendCalls versions...')
       const probedVersion = await probeSendCallsVersion()
-      console.log('[BatchTransaction] Probed sendCalls version:', probedVersion)
       return {
         supported: !!probedVersion,
         version: probedVersion,
       }
-    } catch (err) {
+    } catch (_err) {
       // Wallet doesn't support getCapabilities, try probing
-      console.log('[BatchTransaction] getCapabilities failed, probing sendCalls versions...', err)
-      // #region agent log
-      __agentLog('B', 'useBatchTransaction.ts:checkEIP5792Support', 'getCapabilities failed', {
-        errorName: (err as any)?.name ?? null,
-        errorCode: (err as any)?.code ?? null,
-        errorMessage: String((err as any)?.message ?? ''),
-      })
-      // #endregion agent log
       const probedVersion = await probeSendCallsVersion()
-      console.log('[BatchTransaction] Probed sendCalls version:', probedVersion)
       return {
         supported: !!probedVersion,
         version: probedVersion,
@@ -502,34 +494,21 @@ export function useBatchTransaction() {
   const detectCapabilities = async (targetChainId?: number): Promise<BatchCapabilities> => {
     isDetecting.value = true
 
-    console.log('[BatchTransaction] Starting capability detection...', {
-      address: address.value,
-      chainId: chainId.value,
-      targetChainId,
-      hasWalletClient: !!walletClient.value,
-    })
-    // #region agent log
-    __agentLog('B', 'useBatchTransaction.ts:detectCapabilities', 'entry', {
-      chainId: chainId.value ?? null,
-      targetChainId: targetChainId ?? null,
-      hasWalletClient: !!walletClient.value,
-    })
-    // #endregion agent log
-
     try {
-      // Detect wallet type first
+      // Detect wallet provider first (for batch limits)
+      const provider = detectWalletProvider()
+      walletProvider.value = provider
+
+      // Detect wallet type
       const type = await detectWalletType()
       walletType.value = type
-      console.log('[BatchTransaction] Wallet type detected:', type)
 
       // Check EIP-7702 support (for EOAs and unknown types)
       // We check for unknown too in case getCode failed but wallet still supports 7702
       const eip7702 = type === 'eoa' || type === 'unknown' ? await checkEIP7702Support() : false
-      console.log('[BatchTransaction] EIP-7702 support:', eip7702)
 
       // Check EIP-5792 support (for SCWs and fallback)
       const eip5792 = await checkEIP5792Support(targetChainId)
-      console.log('[BatchTransaction] EIP-5792 support:', eip5792)
 
       // Determine preferred method
       let preferredMethod: BatchMethod = 'none'
@@ -548,17 +527,21 @@ export function useBatchTransaction() {
         preferredMethod = 'sequential'
       }
 
+      // Get max batch size based on wallet provider
+      const maxBatchSize = WALLET_BATCH_LIMITS[provider]
+
       const caps: BatchCapabilities = {
         walletType: type,
+        walletProvider: provider,
         supportsEIP7702: eip7702,
         supportsEIP5792: eip5792.supported,
         preferredMethod,
         sendCallsVersion: eip5792.version,
+        maxBatchSize,
       }
 
       capabilities.value = caps
 
-      console.log('[BatchTransaction] Final capabilities:', caps)
       logger.info('Batch capabilities detected', { ...caps })
 
       return caps
@@ -910,10 +893,12 @@ export function useBatchTransaction() {
     if (newClient && newAddress) {
       capabilities.value = null
       walletType.value = 'unknown'
+      walletProvider.value = 'unknown'
       detectCapabilities()
     } else {
       capabilities.value = null
       walletType.value = 'unknown'
+      walletProvider.value = 'unknown'
     }
   })
 
@@ -931,6 +916,10 @@ export function useBatchTransaction() {
   const isEOA = computed(() => walletType.value === 'eoa')
   const isSmartWallet = computed(() => walletType.value === 'smart_contract')
 
+  const maxBatchSize = computed(
+    () => capabilities.value?.maxBatchSize ?? WALLET_BATCH_LIMITS.unknown
+  )
+
   // ============================================================================
   // Return
   // ============================================================================
@@ -939,6 +928,7 @@ export function useBatchTransaction() {
     // State
     isDetecting,
     walletType,
+    walletProvider,
     capabilities,
     isPending,
     status,
@@ -947,12 +937,14 @@ export function useBatchTransaction() {
     // Computed
     supportsBatching,
     batchMethod,
+    maxBatchSize,
     isEOA,
     isSmartWallet,
 
     // Methods
     detectCapabilities,
     detectWalletType,
+    detectWalletProvider,
     executeBatch,
     executeWithEIP7702,
     executeWithEIP5792,

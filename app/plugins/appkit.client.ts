@@ -1,6 +1,7 @@
 import { defineNuxtPlugin } from '#app'
 import { createAppKit } from '@reown/appkit/vue'
 import { appKitNetworks, getWagmiAdapter } from '~/utils/wagmi'
+import { logger } from '~/utils/logger'
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
@@ -41,7 +42,7 @@ export default defineNuxtPlugin(() => {
 
       return url.toString()
     } catch (error: unknown) {
-      console.warn('Invalid APP_URL configured, falling back to localhost:', error)
+      logger.warn('Invalid APP_URL configured, falling back to localhost', { error })
       return 'http://localhost:3000'
     }
   }

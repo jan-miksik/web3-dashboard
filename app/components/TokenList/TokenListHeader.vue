@@ -11,6 +11,7 @@ interface Props {
   showChainFilter: boolean
   isLoading: boolean
   isRefreshing: boolean
+  chainBalances?: Record<number, number>
   isChainSelected: (chainId: number) => boolean
   onToggleChain: (chainId: number) => void
   onClickAllNetworks: () => void
@@ -41,6 +42,7 @@ const emit = defineEmits<{
         :selected-chain-ids="selectedChainIds"
         :selected-chains-display="selectedChainsDisplay"
         :show-chain-filter="showChainFilter"
+        :chain-balances="chainBalances"
         :is-chain-selected="isChainSelected"
         @toggle-chain="onToggleChain"
         @click-all-networks="onClickAllNetworks"

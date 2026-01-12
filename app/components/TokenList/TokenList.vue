@@ -13,6 +13,7 @@ const {
   showChainFilter,
   isRefreshing,
   copiedAddress,
+  chainBalances,
   chainsWithAssets,
   chainsWithoutAssets,
   highValueTokens,
@@ -51,6 +52,7 @@ const {
       :selected-chain-ids="selectedChainIds"
       :selected-chains-display="selectedChainsDisplay"
       :show-chain-filter="showChainFilter"
+      :chain-balances="chainBalances"
       :is-loading="isLoading"
       :is-refreshing="isRefreshing"
       :is-chain-selected="isChainSelected"

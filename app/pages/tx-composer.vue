@@ -5,6 +5,7 @@ import ComposerWidget from '~/components/tx-composer/ComposerWidget.vue'
 import NetworkFilter from '~/components/NetworkFilter.vue'
 import { useTxComposer } from '~/composables/useTxComposer'
 import { CHAIN_METADATA } from '~/utils/chains'
+import type { ChainMetadata } from '~/utils/chains'
 
 const {
   allTokens,
@@ -49,6 +50,17 @@ const hasInvalidRange = computed(() => {
   return minUsdValue.value > maxUsdValue.value
 })
 
+const sortChainsByValue = (
+  chains: ChainMetadata[],
+  balances: Record<number, number>
+): ChainMetadata[] => {
+  return [...chains].sort((a, b) => {
+    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
+    if (diff !== 0) return diff
+    return a.name.localeCompare(b.name)
+  })
+}
+
 // Chain filter logic
 const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 0) {
@@ -74,12 +86,14 @@ const chainBalances = computed(() => {
 
 const chainsWithAssets = computed(() => {
   const chainIdsInTokens = new Set(allTokens.value.map(t => t.chainId))
-  return CHAIN_METADATA.filter(c => chainIdsInTokens.has(c.id))
+  const available = CHAIN_METADATA.filter(c => chainIdsInTokens.has(c.id))
+  return sortChainsByValue(available, chainBalances.value)
 })
 
 const chainsWithoutAssets = computed(() => {
   const chainIdsInTokens = new Set(allTokens.value.map(t => t.chainId))
-  return CHAIN_METADATA.filter(c => !chainIdsInTokens.has(c.id))
+  const unavailable = CHAIN_METADATA.filter(c => !chainIdsInTokens.has(c.id))
+  return sortChainsByValue(unavailable, chainBalances.value)
 })
 
 const isChainSelected = (chainId: number): boolean => {

@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useConnectorClient, useAccount, useConfig, useSwitchChain } from '@wagmi/vue'
+import { useConnectorClient, useConnection, useConfig, useSwitchChain } from '@wagmi/vue'
 import { getPublicClient } from '@wagmi/core'
 import { encodeFunctionData, type Address, type Hex, zeroAddress, parseAbi } from 'viem'
 import { type Route, getStepTransaction } from '@lifi/sdk'
@@ -15,10 +15,41 @@ const ERC20_ABI = parseAbi([
   'function approve(address spender, uint256 amount) returns (bool)',
 ])
 
+/**
+ * APPROVAL OPTIMIZATION NOTES:
+ *
+ * Current state: Each ERC20 token swap requires approval + swap call (2 calls per token).
+ * Native tokens (ETH, etc.) only need swap call (1 call per token).
+ *
+ * Why we can't easily reduce approvals:
+ * - Each swap may route through a DIFFERENT DEX/bridge contract
+ * - Each spender (DEX router) needs its own approval
+ * - LiFi aggregates many DEXs, so spenders vary per route
+ *
+ * Current optimizations already in place:
+ * 1. EIP-7702: All approvals + swaps in ONE atomic transaction (best UX)
+ * 2. EIP-5792: Wallet batches all calls together (MetaMask, etc.)
+ * 3. We check existing allowances to skip unnecessary approvals
+ *
+ * Future optimization possibilities:
+ * 1. Permit2 (Uniswap's universal approval):
+ *    - One-time approval to Permit2 contract
+ *    - Signature-based permits for each swap
+ *    - Requires LiFi SDK support + token compatibility
+ *
+ * 2. EIP-2612 Permit:
+ *    - Gasless approvals via signed permits
+ *    - Limited token support
+ *
+ * 3. Approval aggregator contract:
+ *    - User approves one contract that handles all DEX interactions
+ *    - Essentially what EIP-7702 batch executor already does
+ */
+
 export function useBatchComposer() {
   const { getRouteQuote, executeRoute } = useTxComposer()
   const { data: walletClient } = useConnectorClient()
-  const { address } = useAccount()
+  const { address } = useConnection()
   const config = useConfig()
   const { switchChain } = useSwitchChain()
 
@@ -30,7 +61,9 @@ export function useBatchComposer() {
     isPending: isBatching,
     status: batchStatus,
     walletType,
+    walletProvider,
     batchMethod,
+    maxBatchSize,
     isEOA,
     isSmartWallet,
   } = useBatchTransaction()
@@ -41,6 +74,29 @@ export function useBatchComposer() {
   })
 
   const sendCallsVersion = computed(() => capabilities.value?.sendCallsVersion ?? null)
+
+  /**
+   * Splits an array of calls into chunks based on max batch size.
+   * Returns an array of call batches.
+   */
+  const splitIntoBatches = (calls: BatchCall[], maxSize: number): BatchCall[][] => {
+    if (calls.length <= maxSize) {
+      return [calls]
+    }
+
+    const batches: BatchCall[][] = []
+    for (let i = 0; i < calls.length; i += maxSize) {
+      batches.push(calls.slice(i, i + maxSize))
+    }
+    return batches
+  }
+
+  /**
+   * Calculates the number of batches needed for a given number of calls.
+   */
+  const calculateBatchCount = (callCount: number, maxSize: number): number => {
+    return Math.ceil(callCount / maxSize)
+  }
 
   const summarizeCall = (call: BatchCall) => {
     const data = call.data ?? '0x'
@@ -218,20 +274,46 @@ export function useBatchComposer() {
           throw new Error(`No valid transactions to send on ${fromChain.name}`)
         }
 
-        logBatchCalls({
-          fromChainId,
-          fromChainName: fromChain.name,
-          routeCount: routesOnChain.length,
-          calls,
-          method: caps.preferredMethod,
+        // Split into batches based on wallet's max batch size
+        const currentMaxBatchSize = caps.maxBatchSize
+        const batches = splitIntoBatches(calls, currentMaxBatchSize)
+        const totalBatches = batches.length
+
+        logger.info('Batch splitting', {
+          totalCalls: calls.length,
+          maxBatchSize: currentMaxBatchSize,
+          batchCount: totalBatches,
+          walletProvider: caps.walletProvider,
         })
 
-        batchStatus.value = caps.supportsEIP7702
-          ? `Signing batch with EIP-7702 on ${fromChain.name}...`
-          : `Sending batch on ${fromChain.name} (${calls.length} calls)...`
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batchCalls = batches[batchIndex]!
+          const batchNum = batchIndex + 1
 
-        const result = await executeBatch(calls, fromChain)
-        results.push(result)
+          logBatchCalls({
+            fromChainId,
+            fromChainName: fromChain.name,
+            routeCount: routesOnChain.length,
+            calls: batchCalls,
+            method: caps.preferredMethod,
+          })
+
+          // Update status with batch progress
+          const batchProgress = totalBatches > 1 ? ` (batch ${batchNum}/${totalBatches})` : ''
+
+          batchStatus.value = caps.supportsEIP7702
+            ? `Signing batch with EIP-7702 on ${fromChain.name}${batchProgress}...`
+            : `Sending batch on ${fromChain.name} (${batchCalls.length} calls)${batchProgress}...`
+
+          const result = await executeBatch(batchCalls, fromChain)
+          results.push(result)
+
+          // Brief pause between batches to avoid overwhelming the wallet
+          if (batchIndex < batches.length - 1) {
+            batchStatus.value = `Batch ${batchNum}/${totalBatches} complete. Preparing next batch...`
+            await new Promise(resolve => setTimeout(resolve, 500))
+          }
+        }
       } else {
         batchStatus.value = `Executing ${routesOnChain.length} transaction(s) sequentially on ${fromChain.name}...`
         for (let i = 0; i < routesOnChain.length; i++) {
@@ -243,7 +325,7 @@ export function useBatchComposer() {
       }
     }
 
-    batchStatus.value = canBatch ? 'Batch complete!' : 'All transactions complete!'
+    batchStatus.value = canBatch ? 'All batches complete!' : 'All transactions complete!'
     return results
   }
 
@@ -262,9 +344,14 @@ export function useBatchComposer() {
 
     // Wallet type info
     walletType,
+    walletProvider,
     batchMethod,
+    maxBatchSize,
     isEOA,
     isSmartWallet,
     capabilities,
+
+    // Helpers
+    calculateBatchCount,
   }
 }

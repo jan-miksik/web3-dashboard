@@ -11,6 +11,17 @@ const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
   return CHAIN_METADATA.filter(chain => chainIds.has(chain.id))
 }
 
+const sortChainsByValue = (
+  chains: ChainMetadata[],
+  balances: Record<number, number>
+): ChainMetadata[] => {
+  return [...chains].sort((a, b) => {
+    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
+    if (diff !== 0) return diff
+    return a.name.localeCompare(b.name)
+  })
+}
+
 export function useTokenList() {
   const { tokens, isLoading, error, refetch, isConnected } = useTokens()
   const { watchedAddress } = useWatchedAddress()
@@ -65,14 +76,24 @@ export function useTokenList() {
   }
 
   // Computed properties for chains
+  const chainBalances = computed<Record<number, number>>(() => {
+    const balances: Record<number, number> = {}
+    tokens.value.forEach(token => {
+      balances[token.chainId] = (balances[token.chainId] || 0) + token.usdValue
+    })
+    return balances
+  })
+
   const chainsWithAssets = computed(() => {
     const chainIds = new Set(tokens.value.map(t => t.chainId))
-    return getAvailableChains(chainIds)
+    const availableChains = getAvailableChains(chainIds)
+    return sortChainsByValue(availableChains, chainBalances.value)
   })
 
   const chainsWithoutAssets = computed(() => {
     const chainsWithAssetsIds = new Set(tokens.value.map(t => t.chainId))
-    return CHAIN_METADATA.filter(chain => !chainsWithAssetsIds.has(chain.id))
+    const chains = CHAIN_METADATA.filter(chain => !chainsWithAssetsIds.has(chain.id))
+    return sortChainsByValue(chains, chainBalances.value)
   })
 
   // Computed properties for token filtering
@@ -218,6 +239,7 @@ export function useTokenList() {
     showChainFilter,
     isRefreshing,
     copiedAddress,
+    chainBalances,
     chainsWithAssets,
     chainsWithoutAssets,
     highValueTokens,

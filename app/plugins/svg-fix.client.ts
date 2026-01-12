@@ -1,4 +1,5 @@
 import { defineNuxtPlugin } from '#app'
+import { logger } from '~/utils/logger'
 
 /**
  * SVG Fix Plugin
@@ -125,10 +126,9 @@ export default defineNuxtPlugin(() => {
       }
     } catch (error) {
       // If defineProperty fails (e.g., property is not configurable), try direct assignment
-      console.warn(
-        '[svg-fix] Failed to restore setAttribute via descriptor, using direct assignment:',
-        error
-      )
+      logger.warn('Failed to restore setAttribute via descriptor, using direct assignment', {
+        error,
+      })
       SVGElement.prototype.setAttribute = originalSetAttribute
     }
   }

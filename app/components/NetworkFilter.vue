@@ -16,7 +16,7 @@ interface Props {
   chainBalances?: Record<number, number>
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const chainFilterRef = ref<HTMLElement | null>(null)
 
@@ -62,7 +62,22 @@ const formatBalance = (val: number | undefined) => {
       :class="{ active: selectedChainIds.size > 0 }"
       @click="$emit('update:showChainFilter', !showChainFilter)"
     >
-      <span class="filter-value">{{ selectedChainsDisplay }}</span>
+      <div class="filter-content">
+        <img
+          v-if="
+            selectedChainIds.size === 1 &&
+            (chainsWithAssets.find(c => selectedChainIds.has(c.id))?.icon ||
+              chainsWithoutAssets.find(c => selectedChainIds.has(c.id))?.icon)
+          "
+          :src="
+            chainsWithAssets.find(c => selectedChainIds.has(c.id))?.icon ||
+            chainsWithoutAssets.find(c => selectedChainIds.has(c.id))?.icon
+          "
+          :alt="selectedChainsDisplay"
+          class="filter-chain-icon"
+        />
+        <span class="filter-value">{{ selectedChainsDisplay }}</span>
+      </div>
       <span class="filter-arrow" :class="{ rotated: showChainFilter }">▼</span>
     </button>
     <Transition name="dropdown">
@@ -163,10 +178,29 @@ const formatBalance = (val: number | undefined) => {
   background: var(--accent-muted);
 }
 
+.filter-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.filter-chain-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .filter-value {
   font-size: 13px;
   color: var(--text-primary);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .filter-arrow {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useAccount, useConfig } from '@wagmi/vue'
+import { useConnection, useConfig } from '@wagmi/vue'
 import { getPublicClient } from '@wagmi/core'
 import { isAddress, parseAbi, zeroAddress, type Address } from 'viem'
 import { CHAIN_METADATA } from '~/utils/chains'
+import type { ChainMetadata } from '~/utils/chains'
 import { getGasTokenName, getUSDCAddress } from '~/utils/tokenAddresses'
 import { handleError } from '~/utils/error-handler'
 import { formatUsdValueParts } from '~/utils/format'
@@ -14,7 +15,7 @@ import type { Route } from '@lifi/sdk'
 
 type TargetAssetMode = 'native' | 'usdc' | 'custom'
 
-const { address } = useAccount()
+const { address } = useConnection()
 const config = useConfig()
 
 const {
@@ -28,6 +29,7 @@ const {
   customAmounts,
   setCustomAmount,
   getEffectiveAmount,
+  toggleToken,
 } = useTxComposer()
 
 const {
@@ -38,6 +40,9 @@ const {
   isCheckingSupport,
   checkBatchingSupport,
   batchMethod,
+  walletProvider,
+  maxBatchSize,
+  calculateBatchCount,
 } = useBatchComposer()
 
 const targetChainId = ref<number | null>(null)
@@ -66,6 +71,17 @@ const onClearTargetChain = () => {
   showTargetChainFilter.value = false
 }
 
+const sortChainsByValue = (
+  chains: ChainMetadata[],
+  balances: Record<number, number>
+): ChainMetadata[] => {
+  return [...chains].sort((a, b) => {
+    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
+    if (diff !== 0) return diff
+    return a.name.localeCompare(b.name)
+  })
+}
+
 const chainBalances = computed(() => {
   const balances: Record<number, number> = {}
   allTokens.value.forEach(t => {
@@ -73,6 +89,8 @@ const chainBalances = computed(() => {
   })
   return balances
 })
+
+const chainsByBalance = computed(() => sortChainsByValue(CHAIN_METADATA, chainBalances.value))
 
 const totalValueIn = computed(() => {
   return selectedTokens.value.reduce((sum, t) => {
@@ -96,6 +114,25 @@ const totalValueOut = computed(() => {
 const hasOutQuotes = computed(() =>
   selectedTokens.value.some(t => quotes.value[tokenKey(t)]?.status === 'ok')
 )
+
+const totalFees = computed(() => {
+  return selectedTokens.value.reduce((sum, t) => {
+    const quote = quotes.value[tokenKey(t)]
+    if (quote?.status === 'ok') {
+      const route = (quote as { route: Route }).route
+      // Calculate fees: gasCostUSD from steps
+      const gasCostUSD = route.steps.reduce((stepSum, step) => {
+        const gasCost =
+          step.estimate?.gasCosts?.reduce((gasSum, gas) => {
+            return gasSum + Number(gas.amountUSD || 0)
+          }, 0) || 0
+        return stepSum + gasCost
+      }, 0)
+      return sum + gasCostUSD
+    }
+    return sum
+  }, 0)
+})
 
 const formatUsdValue = (value: number) => formatUsdValueParts(value)
 
@@ -308,8 +345,10 @@ type QuoteState =
   | { status: 'error'; message: string; paramsKey: string }
 
 const quotes = ref<Record<string, QuoteState>>({})
-const isLoadingQuotes = ref(false)
 const quotesError = ref<string | null>(null)
+const loadingStartTimes = ref<Record<string, number>>({})
+const loadingTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({})
+const MIN_ROUTE_LOADING_MS = 1000
 
 let quoteTimer: ReturnType<typeof setTimeout> | null = null
 let quoteRequestId = 0
@@ -365,7 +404,6 @@ async function refreshQuotes() {
   }
 
   const currentId = ++quoteRequestId
-  isLoadingQuotes.value = true
 
   // Only mark as loading the ones that actually changed params
   const currentQuotes = { ...quotes.value }
@@ -382,6 +420,13 @@ async function refreshQuotes() {
     }
 
     currentQuotes[k] = { status: 'loading', paramsKey }
+    if (!loadingStartTimes.value[k]) {
+      loadingStartTimes.value[k] = Date.now()
+    }
+    if (loadingTimers.value[k]) {
+      clearTimeout(loadingTimers.value[k])
+      delete loadingTimers.value[k]
+    }
     tokensToFetch.push(t)
   }
 
@@ -390,13 +435,17 @@ async function refreshQuotes() {
   for (const k in currentQuotes) {
     if (!selectedKeys.has(k)) {
       delete currentQuotes[k]
+      delete loadingStartTimes.value[k]
+      if (loadingTimers.value[k]) {
+        clearTimeout(loadingTimers.value[k])
+        delete loadingTimers.value[k]
+      }
     }
   }
 
   quotes.value = currentQuotes
 
   if (tokensToFetch.length === 0) {
-    isLoadingQuotes.value = false
     return
   }
 
@@ -423,24 +472,43 @@ async function refreshQuotes() {
 
     if (currentId !== quoteRequestId) return
 
-    const updated = { ...quotes.value }
     for (const { k, q, sameToken, paramsKey } of results as any[]) {
-      if (sameToken) {
-        updated[k] = { status: 'error', message: 'Already the destination token', paramsKey }
-      } else if (!q) {
-        updated[k] = { status: 'error', message: 'No route found', paramsKey }
+      const nextState: QuoteState = sameToken
+        ? { status: 'error', message: 'Already the destination token', paramsKey }
+        : !q
+          ? { status: 'error', message: 'No route found', paramsKey }
+          : { status: 'ok', route: q.route, cached: q.cached, paramsKey }
+
+      const startedAt = loadingStartTimes.value[k] ?? Date.now()
+      const elapsed = Date.now() - startedAt
+      const remaining = Math.max(MIN_ROUTE_LOADING_MS - elapsed, 0)
+
+      const applyState = () => {
+        if (currentId !== quoteRequestId) return
+        const merged = { ...quotes.value, [k]: nextState }
+        quotes.value = merged
+        delete loadingStartTimes.value[k]
+        if (loadingTimers.value[k]) {
+          delete loadingTimers.value[k]
+        }
+      }
+
+      if (loadingTimers.value[k]) {
+        clearTimeout(loadingTimers.value[k])
+        delete loadingTimers.value[k]
+      }
+
+      if (remaining > 0) {
+        loadingTimers.value[k] = setTimeout(applyState, remaining)
       } else {
-        updated[k] = { status: 'ok', route: q.route, cached: q.cached, paramsKey }
+        applyState()
       }
     }
-    quotes.value = updated
   } catch (e: any) {
     if (currentId !== quoteRequestId) return
     quotesError.value = e?.message ? String(e.message) : 'Failed to fetch quotes'
   } finally {
-    if (currentId === quoteRequestId) {
-      isLoadingQuotes.value = false
-    }
+    // keep hook for future cleanup if needed
   }
 }
 
@@ -450,6 +518,9 @@ watch(quoteDependencies, () => {
 
 onUnmounted(() => {
   if (quoteTimer) clearTimeout(quoteTimer)
+  for (const key in loadingTimers.value) {
+    clearTimeout(loadingTimers.value[key])
+  }
 })
 
 // Get chain icon for a token
@@ -505,12 +576,50 @@ onUnmounted(() => {
   window.removeEventListener('click', handleClickOutsideDropdown)
 })
 
+// Estimate total calls (each non-native token needs approval + swap, native only needs swap)
+const estimatedCallCount = computed(() => {
+  let count = 0
+  for (const t of selectedTokens.value) {
+    // Skip if same as destination
+    if (isSameAsDestination(t)) continue
+    // Native tokens don't need approval
+    const isNative = t.address.toLowerCase() === '0x0000000000000000000000000000000000000000'
+    count += isNative ? 1 : 2 // 1 for swap, 1 for approval if ERC20
+  }
+  return count
+})
+
+// Calculate estimated number of batches needed
+const estimatedBatchCount = computed(() => {
+  if (!supportsBatching.value || !useBatching.value) return 1
+  return calculateBatchCount(estimatedCallCount.value, maxBatchSize.value)
+})
+
+// Check if we need multiple batches
+const needsMultipleBatches = computed(() => estimatedBatchCount.value > 1)
+
+// Get wallet provider display name
+const walletProviderDisplayName = computed(() => {
+  const provider = walletProvider.value
+  const names: Record<string, string> = {
+    metamask: 'MetaMask',
+    rabby: 'Rabby',
+    coinbase: 'Coinbase',
+    unknown: 'Wallet',
+  }
+  return names[provider] ?? 'Wallet'
+})
+
 const executeButtonText = computed(() => {
   if (isCheckingSupport.value) return 'Checking wallet...'
   if (isExecuting.value) return executionStatus.value || 'Executing...'
   if (isBatching.value) return batchStatus.value || 'Executing...'
 
   if (supportsBatching.value && useBatching.value && selectedTokens.value.length >= 2) {
+    const batchCount = estimatedBatchCount.value
+    if (batchCount > 1) {
+      return `Execute (${batchCount} batches)`
+    }
     return batchMethod.value === 'eip7702' ? '⚡ One-Click Execute' : 'Batch Execute'
   }
   return 'Execute'
@@ -772,6 +881,21 @@ const getTargetChainName = () => {
             </span>
           </div>
         </div>
+        <div class="stat">
+          <label>Est. Fees</label>
+          <div class="value">
+            <span v-if="hasOutQuotes && totalFees > 0">
+              {{ formatUsdValue(totalFees).main }}
+            </span>
+            <span v-else>—</span>
+            <span
+              v-if="hasOutQuotes && totalFees > 0 && formatUsdValue(totalFees).extra"
+              class="usd-sub-decimals"
+            >
+              {{ formatUsdValue(totalFees).extra }}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -780,7 +904,7 @@ const getTargetChainName = () => {
         <div class="control-group chain-group">
           <label>to chain</label>
           <NetworkFilter
-            :chains-with-assets="CHAIN_METADATA"
+            :chains-with-assets="chainsByBalance"
             :chains-without-assets="[]"
             :selected-chain-ids="selectedTargetChainIds"
             :selected-chains-display="selectedTargetChainDisplay"
@@ -945,13 +1069,44 @@ const getTargetChainName = () => {
         <div v-if="isCheckingSupport" class="checking-status">
           <span class="spinner-xs"></span> Checking wallet…
         </div>
-        <div v-else-if="supportsBatching" class="checkbox-line">
-          <label>
-            <input v-model="useBatching" type="checkbox" />
-            <span>{{
-              batchMethod === 'eip7702' ? 'One-Click Mode (EIP-7702)' : 'Batch (EIP-5792)'
-            }}</span>
-          </label>
+        <div v-else-if="supportsBatching" class="batch-settings">
+          <div class="checkbox-line">
+            <label>
+              <input v-model="useBatching" type="checkbox" />
+              <span>{{
+                batchMethod === 'eip7702' ? 'One-Click Mode (EIP-7702)' : 'Batch (EIP-5792)'
+              }}</span>
+            </label>
+          </div>
+          <!-- Batch info when multiple batches needed -->
+          <div v-if="useBatching && needsMultipleBatches" class="batch-info">
+            <div class="batch-info-icon">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.25" />
+                <path
+                  d="M8 7V12"
+                  stroke="currentColor"
+                  stroke-width="1.25"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M8 5.25H8.01"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+            <div class="batch-info-content">
+              <span class="batch-info-text">
+                {{ walletProviderDisplayName }} supports max {{ maxBatchSize }} calls/batch. This
+                will require <strong>{{ estimatedBatchCount }} batches</strong> ({{
+                  estimatedCallCount
+                }}
+                total calls).
+              </span>
+            </div>
+          </div>
         </div>
         <div v-else-if="supportsBatching === false" class="info-text">
           Wallet does not support batching; will execute sequentially.
@@ -1013,6 +1168,22 @@ const getTargetChainName = () => {
             class="preview-card"
             :class="{ loading: quotes[`${t.chainId}-${t.address}`]?.status === 'loading' }"
           >
+            <button
+              class="preview-cancel-btn"
+              type="button"
+              :title="'Remove ' + t.symbol"
+              @click="toggleToken(t)"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M12 4L4 12M4 4L12 12"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
             <div class="preview-columns">
               <!-- Send Column -->
               <div class="preview-column">
@@ -1073,9 +1244,13 @@ const getTargetChainName = () => {
               <!-- Receive Column -->
               <div class="preview-column receive">
                 <template v-if="quotes[`${t.chainId}-${t.address}`]?.status === 'loading'">
-                  <div class="preview-loading inline">
-                    <span class="spinner-xs"></span>
-                    <span>Fetching quote...</span>
+                  <div class="route-search-indicator compact">
+                    <div class="search-dots">
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                    </div>
+                    <span class="search-text">Finding best route</span>
                   </div>
                 </template>
                 <template v-else-if="quotes[`${t.chainId}-${t.address}`]?.status === 'error'">
@@ -1169,16 +1344,18 @@ const getTargetChainName = () => {
                   </div>
                 </template>
                 <template v-else>
-                  <div class="preview-pending">Awaiting quote</div>
+                  <div class="route-search-indicator compact">
+                    <div class="search-dots">
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                    </div>
+                    <span class="search-text">Finding best route</span>
+                  </div>
                 </template>
               </div>
             </div>
           </div>
-        </div>
-
-        <div v-if="isLoadingQuotes" class="preview-updating">
-          <span class="spinner-xs"></span>
-          <span>Updating quotes...</span>
         </div>
       </div>
 
@@ -1614,14 +1791,47 @@ input {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 10px;
+  padding-right: 32px; /* Added padding to prevent cancel button overlap */
   display: flex;
   flex-direction: column;
   gap: 6px;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .preview-card:hover {
   border-color: var(--primary-color);
+}
+
+.preview-cancel-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px; /* Slightly smaller */
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  z-index: 10;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.preview-cancel-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--error, #ef4444);
+  color: var(--error, #ef4444);
+  transform: scale(1.1);
+}
+
+.preview-cancel-btn:active {
+  transform: scale(0.95);
 }
 
 .preview-columns {
@@ -1827,6 +2037,113 @@ input {
   font-weight: 700;
 }
 
+/* Batch settings and info */
+.batch-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-line label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  user-select: none;
+  padding: 4px 0;
+}
+
+.checkbox-line input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--accent-primary, mediumseagreen);
+  border-radius: 4px;
+  border: 2px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.checkbox-line input[type='checkbox']:checked {
+  background: var(--accent-primary, mediumseagreen);
+  border-color: var(--accent-primary, mediumseagreen);
+}
+
+.checkbox-line input[type='checkbox']:hover {
+  border-color: var(--accent-primary, mediumseagreen);
+}
+
+.checkbox-line input[type='checkbox']:focus {
+  outline: 2px solid var(--accent-muted, rgba(60, 179, 113, 0.3));
+  outline-offset: 2px;
+}
+
+.batch-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  border-left: 3px solid var(--warning, #f59e0b);
+}
+
+.batch-info-icon {
+  color: var(--warning, #f59e0b);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.batch-info-content {
+  flex: 1;
+}
+
+.batch-info-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.batch-info-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.checking-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.info-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+.info-text.skipped-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
 .execute-btn {
   background: mediumseagreen;
   color: white;
@@ -1866,6 +2183,71 @@ input {
     border-top: 1px solid var(--border-color);
     padding-top: 8px;
   }
+}
+
+/* Route loading indicator */
+.route-search-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+}
+
+.route-search-indicator.compact {
+  padding: 4px 10px;
+}
+
+.search-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.search-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-primary, mediumseagreen);
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+.search-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.search-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.search-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.search-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Loading card state */
+.preview-card.loading {
+  border-color: var(--accent-primary, mediumseagreen);
+  box-shadow: 0 0 0 1px var(--accent-muted, rgba(60, 179, 113, 0.2));
 }
 
 .spinner-xs {
