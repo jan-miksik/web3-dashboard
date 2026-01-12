@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import AssetList from '~/components/tx-composer/AssetList.vue'
-import ComposerWidget from '~/components/tx-composer/ComposerWidget.vue'
-import NetworkFilter from '~/components/NetworkFilter.vue'
 import { useTxComposer } from '~/composables/useTxComposer'
 import { CHAIN_METADATA } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
@@ -168,10 +165,10 @@ const onClickAllNetworks = () => {
 
     <div v-else class="content-grid">
       <div class="left-col">
-        <AssetList :tokens="filteredTokens" :selected-ids="selectedTokenIds" />
+        <TxComposerAssetList :tokens="filteredTokens" :selected-ids="selectedTokenIds" />
       </div>
       <div class="right-col">
-        <ComposerWidget />
+        <TxComposerComposerWidget />
       </div>
     </div>
   </div>

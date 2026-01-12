@@ -1,0 +1,24 @@
+---
+description: Frontend component conventions (Nuxt + Vue)
+alwaysApply: true
+---
+
+## Nuxt component usage
+
+- **Do not import Vue components** from `~/components/**` inside `.vue` files.
+  - Nuxt auto-registers components in `/components`, including nested folders.
+  - Just use the component in the template (PascalCase), e.g. `<NetworkFilter />`.
+  - **Allowed exceptions**:
+    - Dynamic imports via `defineAsyncComponent` (performance/code splitting)
+    - Importing **types only** (e.g. `import type { ... } from ...`)
+
+## CSS rules
+
+- **Use BEM** for component classes:
+  - Block: `component-name`
+  - Element: `component-name__element`
+  - Modifier: `component-name__element--modifier` or `component-name--modifier`
+- **Co-locate styles**: put `<style scoped>` in the component that owns the markup.
+  - Avoid “god” parent stylesheets with `:deep(...)` to style children.
+  - Avoid broad selectors like `input`, `button`, `div` inside scoped styles; prefer class selectors.
+
