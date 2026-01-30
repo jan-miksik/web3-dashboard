@@ -42,7 +42,13 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
           <div class="token-symbol-row">
             <span class="token-symbol">
               {{ token.symbol }}
-              <span v-if="token.tokenType === 'native'" class="native-badge">NATIVE</span>
+              <span
+                v-if="token.tokenType === 'native'"
+                class="native-badge token-row__native-badge--tooltip"
+                data-tooltip="Native token does not have a contract address"
+              >
+                NATIVE
+              </span>
             </span>
             <button
               v-if="token.address && token.address !== '0x0000000000000000000000000000000000000000'"
@@ -219,6 +225,33 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
   padding: 2px 4px;
   border-radius: 4px;
   font-weight: 700;
+}
+
+.token-row__native-badge--tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.token-row__native-badge--tooltip:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  max-width: 400px;
+  width: 210px;
+  white-space: normal;
+  text-align: center;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 
 .token-address-btn {

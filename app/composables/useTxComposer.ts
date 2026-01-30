@@ -35,6 +35,9 @@ const selectedTokenIds = ref<Set<string>>(new Set())
 // If not set, uses full balance
 const customAmounts = ref<Map<string, string>>(new Map())
 
+// Default percentage of balance to select when user clicks an asset (0–100)
+const defaultSelectionPercent = ref(100)
+
 const isExecuting = ref(false)
 const executionStatus = ref<string>('')
 
@@ -114,6 +117,26 @@ export function useTxComposer() {
     return filteredTokens.value.filter(t => selectedTokenIds.value.has(`${t.chainId}-${t.address}`))
   })
 
+  const applyDefaultPercentToToken = (token: Token) => {
+    const pct = Math.min(100, Math.max(0, defaultSelectionPercent.value))
+    if (pct >= 100) {
+      setCustomAmount(token, null)
+      return
+    }
+    const balance = BigInt(token.balance)
+    // Support 2 decimal places (e.g. 0.01, 50.5): (balance * pct*100) / 10000
+    const amount = (balance * BigInt(Math.round(pct * 100))) / 10000n
+    setCustomAmount(token, amount === balance ? null : amount.toString())
+  }
+
+  const applyDefaultPercentToAllSelected = () => {
+    for (const token of filteredTokens.value) {
+      if (selectedTokenIds.value.has(`${token.chainId}-${token.address}`)) {
+        applyDefaultPercentToToken(token)
+      }
+    }
+  }
+
   const toggleToken = (token: Token) => {
     const id = `${token.chainId}-${token.address}`
     const newSet = new Set(selectedTokenIds.value)
@@ -121,13 +144,22 @@ export function useTxComposer() {
       newSet.delete(id)
     } else {
       newSet.add(id)
+      selectedTokenIds.value = newSet
+      applyDefaultPercentToToken(token)
+      return
     }
     selectedTokenIds.value = newSet
   }
 
   const selectTokens = (tokens: Token[]) => {
+    const prev = selectedTokenIds.value
     const newSet = new Set(selectedTokenIds.value)
-    tokens.forEach(t => newSet.add(`${t.chainId}-${t.address}`))
+    tokens.forEach(t => {
+      const id = `${t.chainId}-${t.address}`
+      const isNew = !prev.has(id)
+      newSet.add(id)
+      if (isNew) applyDefaultPercentToToken(t)
+    })
     selectedTokenIds.value = newSet
   }
 
@@ -295,6 +327,14 @@ export function useTxComposer() {
     getCustomAmount,
     setCustomAmount,
     getEffectiveAmount,
+
+    // Default selection percentage (0–100) when clicking an asset
+    defaultSelectionPercent,
+    setDefaultSelectionPercent: (pct: number) => {
+      const clamped = Math.min(100, Math.max(0, pct))
+      defaultSelectionPercent.value = Number.isFinite(clamped) ? clamped : 100
+    },
+    applyDefaultPercentToAllSelected,
 
     // Quotes + execution
     getRouteQuote,

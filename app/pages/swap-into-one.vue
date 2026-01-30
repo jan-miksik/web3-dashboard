@@ -4,6 +4,8 @@ import { useTxComposer } from '~/composables/useTxComposer'
 import { CHAIN_METADATA } from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
 
+useHead({ title: 'Swap into One | Web3 Dashboard' })
+
 const {
   allTokens,
   filteredTokens,
@@ -114,60 +116,68 @@ const onClickAllNetworks = () => {
 </script>
 
 <template>
-  <div class="tx-composer-page">
-    <div class="page-header">
-      <div class="header-main">
-        <h1 class="title">TxComposer</h1>
-        <div class="warning-banner-inline">
-          <div class="warning-icon">⚠️</div>
-          <div class="warning-content">
+  <div class="swap-into-one-page">
+    <div class="swap-into-one-page__header">
+      <NuxtLink to="/" class="swap-into-one-page__back">
+        <span class="swap-into-one-page__back-arrow" aria-hidden="true">←</span>
+        <span>Dashboard</span>
+      </NuxtLink>
+      <div class="swap-into-one-page__header-main">
+        <h1 class="swap-into-one-page__title">Swap into One</h1>
+        <div class="swap-into-one-page__warning-banner">
+          <div class="swap-into-one-page__warning-icon">⚠️</div>
+          <div class="swap-into-one-page__warning-content">
             <strong>Development & Testing</strong>
             <p>Use with caution. Verify transactions before confirming.</p>
           </div>
         </div>
       </div>
-      <p class="subtitle">
-        Compose swap/bridge transactions and optionally send output to a recipient.
+      <p class="swap-into-one-page__subtitle">
+        Select tokens across chains, swap or bridge them into a single asset.
       </p>
     </div>
 
-    <div class="filters">
-      <div class="filter-group">
-        <label>Min value (USD)</label>
-        <input v-model="minInput" type="number" min="0" step="0.01" placeholder="Any" />
+    <div class="swap-into-one-page__filters">
+      <div class="swap-into-one-page__filters-first-row">
+        <div class="swap-into-one-page__filter-group">
+          <label>Min value (USD)</label>
+          <input v-model="minInput" type="number" min="0" step="0.01" placeholder="Any" />
+        </div>
+        <div class="swap-into-one-page__filter-group">
+          <label>Max value (USD)</label>
+          <input v-model="maxInput" type="number" min="0" step="0.01" placeholder="Any" />
+        </div>
+        <div class="swap-into-one-page__filter-group">
+          <label>Chain</label>
+          <NetworkFilter
+            :chains-with-assets="chainsWithAssets"
+            :chains-without-assets="chainsWithoutAssets"
+            :selected-chain-ids="selectedChainIds"
+            :selected-chains-display="selectedChainsDisplay"
+            :show-chain-filter="showChainFilter"
+            :is-chain-selected="isChainSelected"
+            :on-toggle-chain="toggleChain"
+            :on-click-all-networks="onClickAllNetworks"
+            :chain-balances="chainBalances"
+            @update:show-chain-filter="showChainFilter = $event"
+          />
+        </div>
       </div>
-      <div class="filter-group">
-        <label>Max value (USD)</label>
-        <input v-model="maxInput" type="number" min="0" step="0.01" placeholder="Any" />
+      <div v-if="hasInvalidRange" class="swap-into-one-page__range-error">
+        Min value must be ≤ max value
       </div>
-      <div class="filter-group">
-        <label>Chain</label>
-        <NetworkFilter
-          :chains-with-assets="chainsWithAssets"
-          :chains-without-assets="chainsWithoutAssets"
-          :selected-chain-ids="selectedChainIds"
-          :selected-chains-display="selectedChainsDisplay"
-          :show-chain-filter="showChainFilter"
-          :is-chain-selected="isChainSelected"
-          :on-toggle-chain="toggleChain"
-          :on-click-all-networks="onClickAllNetworks"
-          :chain-balances="chainBalances"
-          @update:show-chain-filter="showChainFilter = $event"
-        />
-      </div>
-      <div v-if="hasInvalidRange" class="range-error">Min value must be ≤ max value</div>
     </div>
 
-    <div v-if="isLoadingTokens" class="loading">
-      <div class="spinner"></div>
+    <div v-if="isLoadingTokens" class="swap-into-one-page__loading">
+      <div class="swap-into-one-page__spinner"></div>
       Loading assets…
     </div>
 
-    <div v-else class="content-grid">
-      <div class="left-col">
+    <div v-else class="swap-into-one-page__content-grid">
+      <div class="swap-into-one-page__left-col">
         <TxComposerAssetList :tokens="filteredTokens" :selected-ids="selectedTokenIds" />
       </div>
-      <div class="right-col">
+      <div class="swap-into-one-page__right-col">
         <TxComposerComposerWidget />
       </div>
     </div>
@@ -175,16 +185,37 @@ const onClickAllNetworks = () => {
 </template>
 
 <style scoped>
-.tx-composer-page {
+.swap-into-one-page {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.page-header {
+.swap-into-one-page__header {
   margin-bottom: 20px;
 }
 
-.header-main {
+.swap-into-one-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.swap-into-one-page__back:hover {
+  color: var(--accent-primary);
+}
+
+.swap-into-one-page__back-arrow {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.swap-into-one-page__header-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -192,7 +223,7 @@ const onClickAllNetworks = () => {
   margin-bottom: 8px;
 }
 
-.warning-banner-inline {
+.swap-into-one-page__warning-banner {
   display: flex;
   gap: 10px;
   padding: 8px 16px;
@@ -202,32 +233,32 @@ const onClickAllNetworks = () => {
   align-items: center;
 }
 
-.warning-icon {
+.swap-into-one-page__warning-icon {
   font-size: 16px;
   flex-shrink: 0;
 }
 
-.warning-content {
+.swap-into-one-page__warning-content {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 8px;
 }
 
-.warning-content strong {
+.swap-into-one-page__warning-content strong {
   color: var(--text-primary);
   font-weight: 600;
   font-size: 13px;
   white-space: nowrap;
 }
 
-.warning-content p {
+.swap-into-one-page__warning-content p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 12px;
 }
 
-.title {
+.swap-into-one-page__title {
   font-size: 32px;
   font-weight: 700;
   margin: 0;
@@ -237,33 +268,39 @@ const onClickAllNetworks = () => {
   -webkit-text-fill-color: transparent;
 }
 
-.subtitle {
+.swap-into-one-page__subtitle {
   color: var(--text-secondary);
   font-size: 16px;
 }
 
-.filters {
+.swap-into-one-page__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.swap-into-one-page__filters-first-row {
   display: flex;
   gap: 16px;
   align-items: flex-end;
-  margin-bottom: 24px;
   flex-wrap: wrap;
 }
 
-.filter-group {
+.swap-into-one-page__filter-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.filter-group label {
+.swap-into-one-page__filter-group label {
   font-size: 12px;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.filter-group input {
+.swap-into-one-page__filter-group input {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   padding: 8px 12px;
@@ -272,34 +309,34 @@ const onClickAllNetworks = () => {
   width: 140px;
 }
 
-.filter-group :deep(.network-filter-btn) {
+.swap-into-one-page__filter-group :deep(.network-filter-btn) {
   width: 140px;
 }
 
-.range-error {
+.swap-into-one-page__range-error {
   color: var(--danger, #ef4444);
   font-size: 13px;
   padding-bottom: 8px;
 }
 
-.content-grid {
+.swap-into-one-page__content-grid {
   display: grid;
   grid-template-columns: 420px minmax(0, 1fr);
   gap: 32px;
 }
 
-.left-col,
-.right-col {
+.swap-into-one-page__left-col,
+.swap-into-one-page__right-col {
   min-width: 0;
 }
 
 @media (max-width: 900px) {
-  .content-grid {
+  .swap-into-one-page__content-grid {
     grid-template-columns: 1fr;
   }
 }
 
-.loading {
+.swap-into-one-page__loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -309,16 +346,16 @@ const onClickAllNetworks = () => {
   color: var(--text-secondary);
 }
 
-.spinner {
+.swap-into-one-page__spinner {
   width: 32px;
   height: 32px;
   border: 3px solid var(--border-color);
   border-top-color: var(--primary-color);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: swap-into-one-page-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes swap-into-one-page-spin {
   to {
     transform: rotate(360deg);
   }

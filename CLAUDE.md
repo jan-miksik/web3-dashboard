@@ -18,6 +18,9 @@ pnpm test:e2e     # Run Playwright E2E tests
 pnpm test:e2e:ui  # Run E2E tests with Playwright UI
 pnpm test:e2e:headed # Run E2E tests in headed browser
 
+# Run a single test file
+pnpm test tests/unit/useTokens.test.ts
+
 pnpm lint         # Run ESLint
 pnpm lint:fix     # Fix ESLint issues
 pnpm format       # Format with Prettier
@@ -59,7 +62,11 @@ This is a **Nuxt 4 + Vue 3** web3 dashboard with **SSR disabled** (required for 
 
 **Client state** uses composables with global refs:
 
-- `useTxComposer()` - multi-token swap composition with quote caching
+- `useTxComposer()` - multi-token swap orchestration (delegates to specialized composables below)
+- `useComposerTargetState()` - destination token/chain selection
+- `useComposerAmountDrafts()` - custom amount overrides per source token
+- `useComposerQuotes()` - LI.FI quote fetching with 2min cache
+- `useComposerBatchSupport()` - wallet capability detection for batch transactions
 - `useBatchComposer()` - EIP-7702/EIP-5792 batch transaction execution
 - `useWatchedAddress()` - localStorage-persisted watch mode
 - `useTokenList()` - UI state (filters, sorting, chain selection)
@@ -152,3 +159,9 @@ NUXT_PUBLIC_APP_URL=http://localhost:3000
 3. **Watch mode** - users can view any wallet without connecting via `useWatchedAddress()`
 4. **Quote caching** - LI.FI quotes are cached 2min to prevent excessive API calls
 5. **Page visibility polling** - token fetching pauses when tab is hidden
+
+## Code Style
+
+- **No Vue component imports** - Nuxt auto-registers components in `/components`. Just use `<ComponentName />` in templates.
+- **BEM for CSS** - Use block**element--modifier naming (e.g., `token-list**item--selected`)
+- **Scoped styles** - Put `<style scoped>` in the component that owns the markup; avoid `:deep()` to style children

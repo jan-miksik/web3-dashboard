@@ -8,7 +8,6 @@ const props = defineProps<{
   formattedTotalOutput: string
   outputTokenSymbol: string
   hasOutQuotes: boolean
-  totalFees: number
 }>()
 
 const formatUsdValue = (value: number) => formatUsdValueParts(value)
@@ -43,23 +42,6 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
           <span v-if="props.hasOutQuotes" class="composer-summary__usd-value-inline">
             ({{ formatUsdValue(props.totalValueOut).main
             }}{{ formatUsdValue(props.totalValueOut).extra }})
-          </span>
-        </div>
-      </div>
-      <div class="composer-summary__stat">
-        <label class="composer-summary__label">Est. Fees</label>
-        <div class="composer-summary__value">
-          <span v-if="props.hasOutQuotes && props.totalFees > 0">
-            {{ formatUsdValue(props.totalFees).main }}
-          </span>
-          <span v-else>—</span>
-          <span
-            v-if="
-              props.hasOutQuotes && props.totalFees > 0 && formatUsdValue(props.totalFees).extra
-            "
-            class="composer-summary__usd-sub-decimals"
-          >
-            {{ formatUsdValue(props.totalFees).extra }}
           </span>
         </div>
       </div>

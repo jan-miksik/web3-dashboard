@@ -1,4 +1,12 @@
 <script setup lang="ts">
+interface BatchBreakdown {
+  totalCalls: number
+  batchCount: number
+  maxSize: number
+  batches: Array<{ batchNumber: number; callCount: number }>
+  isMetaMask: boolean
+}
+
 const props = defineProps<{
   isCheckingSupport: boolean
   supportsBatching: boolean | null
@@ -9,57 +17,71 @@ const props = defineProps<{
   maxBatchSize: number
   estimatedBatchCount: number
   estimatedCallCount: number
-}>()
-
-const emit = defineEmits<{
-  (e: 'update:use-batching', v: boolean): void
+  batchBreakdown?: BatchBreakdown | null
 }>()
 </script>
 
 <template>
   <div class="composer-batch-settings">
-    <div v-if="props.isCheckingSupport" class="composer-batch-settings__checking-status">
-      <span class="composer-batch-settings__spinner"></span> Checking wallet…
-    </div>
-    <div v-else-if="props.supportsBatching" class="composer-batch-settings__settings">
-      <div class="composer-batch-settings__checkbox-line">
-        <label class="composer-batch-settings__checkbox-label">
-          <input
-            :checked="props.useBatching"
-            type="checkbox"
-            class="composer-batch-settings__checkbox"
-            @change="emit('update:use-batching', ($event.target as HTMLInputElement).checked)"
-          />
-          <span>{{
-            props.batchMethod === 'eip7702' ? 'One-Click Mode (EIP-7702)' : 'Batch (EIP-5792)'
-          }}</span>
-        </label>
+    <div
+      v-if="
+        !props.isCheckingSupport &&
+        props.supportsBatching &&
+        props.useBatching &&
+        props.needsMultipleBatches
+      "
+      :class="[
+        'composer-batch-settings__batch-info',
+        {
+          'composer-batch-settings__batch-info--metamask': props.batchBreakdown?.isMetaMask,
+        },
+      ]"
+    >
+      <div class="composer-batch-settings__batch-info-icon">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.25" />
+          <path d="M8 7V12" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
+          <path d="M8 5.25H8.01" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+        </svg>
       </div>
-
-      <div
-        v-if="props.useBatching && props.needsMultipleBatches"
-        class="composer-batch-settings__batch-info"
-      >
-        <div class="composer-batch-settings__batch-info-icon">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.25" />
-            <path d="M8 7V12" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
-            <path
-              d="M8 5.25H8.01"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-            />
-          </svg>
-        </div>
-        <div class="composer-batch-settings__batch-info-content">
+      <div class="composer-batch-settings__batch-info-content">
+        <div class="composer-batch-settings__batch-info-header">
           <span class="composer-batch-settings__batch-info-text">
-            {{ props.walletProviderDisplayName }} supports max {{ props.maxBatchSize }} calls/batch.
-            This will require <strong>{{ props.estimatedBatchCount }} batches</strong> ({{
-              props.estimatedCallCount
-            }}
-            total calls).
+            <strong>{{ props.walletProviderDisplayName }}</strong> supports max
+            <strong>{{ props.maxBatchSize }} calls/batch</strong>.
+            <template v-if="props.batchBreakdown">
+              This will require <strong>{{ props.estimatedBatchCount }} batches</strong> ({{
+                props.estimatedCallCount
+              }}
+              total calls).
+            </template>
+            <template v-else>
+              This will require <strong>{{ props.estimatedBatchCount }} batches</strong> ({{
+                props.estimatedCallCount
+              }}
+              total calls).
+            </template>
           </span>
+        </div>
+        <div
+          v-if="props.batchBreakdown && props.batchBreakdown.batches.length > 0"
+          class="composer-batch-settings__batch-breakdown"
+        >
+          <div class="composer-batch-settings__batch-breakdown-title">Batch breakdown:</div>
+          <div class="composer-batch-settings__batch-breakdown-list">
+            <div
+              v-for="batch in props.batchBreakdown.batches"
+              :key="batch.batchNumber"
+              class="composer-batch-settings__batch-item"
+            >
+              <span class="composer-batch-settings__batch-item-number"
+                >Batch {{ batch.batchNumber }}:</span
+              >
+              <span class="composer-batch-settings__batch-item-count"
+                >{{ batch.callCount }} call{{ batch.callCount !== 1 ? 's' : '' }}</span
+              >
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -76,65 +98,6 @@ const emit = defineEmits<{
   gap: 6px;
 }
 
-.composer-batch-settings__checking-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.composer-batch-settings__spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--text-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.composer-batch-settings__settings {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.composer-batch-settings__checkbox-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.composer-batch-settings__checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-primary);
-  user-select: none;
-  padding: 4px 0;
-}
-
-.composer-batch-settings__checkbox {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  margin: 0;
-  accent-color: var(--accent-primary, mediumseagreen);
-  border-radius: 4px;
-  border: 2px solid var(--border-color);
-  background: var(--bg-primary);
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-
-.composer-batch-settings__checkbox:focus {
-  outline: 2px solid var(--accent-muted, rgba(60, 179, 113, 0.3));
-  outline-offset: 2px;
-}
-
 .composer-batch-settings__batch-info {
   display: flex;
   align-items: flex-start;
@@ -146,13 +109,30 @@ const emit = defineEmits<{
   border-left: 3px solid var(--warning, #f59e0b);
 }
 
+.composer-batch-settings__batch-info--metamask {
+  background: rgba(255, 193, 7, 0.08);
+  border-color: rgba(255, 193, 7, 0.3);
+  border-left-color: #ffc107;
+}
+
 .composer-batch-settings__batch-info-icon {
   color: var(--warning, #f59e0b);
   flex-shrink: 0;
   margin-top: 1px;
 }
 
+.composer-batch-settings__batch-info--metamask .composer-batch-settings__batch-info-icon {
+  color: #ffc107;
+}
+
 .composer-batch-settings__batch-info-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composer-batch-settings__batch-info-header {
   flex: 1;
 }
 
@@ -167,15 +147,49 @@ const emit = defineEmits<{
   font-weight: 600;
 }
 
+.composer-batch-settings__batch-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.composer-batch-settings__batch-breakdown-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.composer-batch-settings__batch-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.composer-batch-settings__batch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.composer-batch-settings__batch-item-number {
+  font-weight: 500;
+  color: var(--text-primary);
+  min-width: 60px;
+}
+
+.composer-batch-settings__batch-item-count {
+  color: var(--text-secondary);
+}
+
 .composer-batch-settings__info-text {
   font-size: 12px;
   color: var(--text-secondary);
   padding: 8px 0;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

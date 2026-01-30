@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { zeroAddress, type Address } from 'viem'
 import { CHAIN_METADATA } from '~/utils/chains'
@@ -30,6 +30,9 @@ const {
   setCustomAmount,
   getEffectiveAmount,
   toggleToken,
+  defaultSelectionPercent,
+  setDefaultSelectionPercent,
+  applyDefaultPercentToAllSelected,
 } = useTxComposer()
 
 const {
@@ -102,6 +105,7 @@ const {
   commitAmountDraft,
   setMaxAmount,
   onUpdateAmountDraft,
+  refreshAmountDrafts,
   formatRawAmount,
   getEffectiveUsdValue,
 } = useComposerAmountDrafts({
@@ -115,6 +119,12 @@ const totalValueIn = computed(() => {
   return selectedTokens.value.reduce((sum, t) => sum + getEffectiveUsdValue(t), 0)
 })
 
+const onApplyDefaultPercentToAllSelected = async () => {
+  applyDefaultPercentToAllSelected()
+  await nextTick()
+  refreshAmountDrafts()
+}
+
 const recipientAddress = computed<string>(() => String(address.value ?? zeroAddress))
 
 const {
@@ -122,7 +132,6 @@ const {
   quotesError,
   hasOutQuotes,
   totalValueOut,
-  totalFees,
   outputTokenSymbol,
   formattedTotalOutput,
   routeToolsForToken,
@@ -161,6 +170,7 @@ const {
   needsMultipleBatches,
   walletProviderDisplayName,
   executeButtonText,
+  batchBreakdown,
 } = useComposerBatchingUi({
   selectedTokens,
   isCheckingSupport,
@@ -272,7 +282,6 @@ const getTargetChainName = () => {
       :formatted-total-output="formattedTotalOutput"
       :output-token-symbol="outputTokenSymbol"
       :has-out-quotes="hasOutQuotes"
-      :total-fees="totalFees"
     />
 
     <div class="composer-widget__controls">
@@ -299,8 +308,13 @@ const getTargetChainName = () => {
         :custom-token-error="customTokenError"
         :resolve-custom-token="resolveCustomToken"
         :target-token-label="targetTokenLabel"
+        :is-checking-support="isCheckingSupport"
+        :supports-batching="supportsBatching"
+        :use-batching="useBatching"
+        :batch-method="batchMethod"
         @update:show-target-chain-filter="showTargetChainFilter = $event"
         @update:custom-token-address-input="customTokenAddressInput = $event"
+        @update:use-batching="useBatching = $event"
       />
 
       <TxComposerComposerWidgetComposerBatchSettings
@@ -313,7 +327,7 @@ const getTargetChainName = () => {
         :max-batch-size="maxBatchSize"
         :estimated-batch-count="estimatedBatchCount"
         :estimated-call-count="estimatedCallCount"
-        @update:use-batching="useBatching = $event"
+        :batch-breakdown="batchBreakdown"
       />
 
       <TxComposerComposerWidgetComposerPreview
@@ -330,6 +344,9 @@ const getTargetChainName = () => {
         :toggle-token="toggleToken"
         :commit-amount-draft="commitAmountDraft"
         :set-max-amount="setMaxAmount"
+        :default-selection-percent="defaultSelectionPercent"
+        :set-default-selection-percent="setDefaultSelectionPercent"
+        :apply-default-percent-to-all-selected="onApplyDefaultPercentToAllSelected"
         :get-chain-icon-url="getChainIconUrl"
         :get-effective-usd-value="getEffectiveUsdValue"
         :get-output-logo="getOutputLogo"

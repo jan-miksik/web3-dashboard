@@ -62,6 +62,36 @@ export function useComposerBatchingUi(options: UseComposerBatchingUiOptions) {
     return names[provider] ?? 'Wallet'
   })
 
+  // Calculate batch breakdown for UI display
+  const batchBreakdown = computed(() => {
+    if (!supportsBatching.value || !useBatching.value || !needsMultipleBatches.value) {
+      return null
+    }
+
+    const totalCalls = estimatedCallCount.value
+    const maxSize = maxBatchSize.value
+    const batchCount = estimatedBatchCount.value
+
+    const batches: Array<{ batchNumber: number; callCount: number }> = []
+    for (let i = 0; i < batchCount; i++) {
+      const start = i * maxSize
+      const end = Math.min(start + maxSize, totalCalls)
+      const callCount = end - start
+      batches.push({
+        batchNumber: i + 1,
+        callCount,
+      })
+    }
+
+    return {
+      totalCalls,
+      batchCount,
+      maxSize,
+      batches,
+      isMetaMask: walletProvider.value === 'metamask',
+    }
+  })
+
   const executeButtonText = computed(() => {
     if (isCheckingSupport.value) return 'Checking wallet...'
     if (isExecuting.value) return executionStatus.value || 'Executing...'
@@ -81,5 +111,6 @@ export function useComposerBatchingUi(options: UseComposerBatchingUiOptions) {
     needsMultipleBatches,
     walletProviderDisplayName,
     executeButtonText,
+    batchBreakdown,
   }
 }

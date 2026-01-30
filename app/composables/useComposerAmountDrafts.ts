@@ -109,11 +109,21 @@ export function useComposerAmountDrafts(options: UseComposerAmountDraftsOptions)
     amountDrafts.value[payload.key] = payload.value
   }
 
+  const refreshAmountDrafts = () => {
+    const next: Record<string, string> = {}
+    for (const t of selectedTokens.value) {
+      const k = tokenKey(t)
+      next[k] = getDisplayAmount(t)
+    }
+    amountDrafts.value = next
+  }
+
   return {
     amountDrafts,
     commitAmountDraft,
     setMaxAmount,
     onUpdateAmountDraft,
+    refreshAmountDrafts,
     formatRawAmount,
     getEffectiveUsdValue,
   }

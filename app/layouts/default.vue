@@ -7,12 +7,22 @@ import {
   showSuccessNotification,
 } from '~/composables/useNotifications'
 import { useRuntimeConfig } from '#app'
+import { useRoute } from 'vue-router'
 
 const runtimeConfig = useRuntimeConfig()
 const hasProjectId = !!runtimeConfig.public.reownProjectId
 const isDev = import.meta.dev
+const route = useRoute()
 
-const sidebarItems = [{ icon: '📊', label: 'Dashboard', path: '/', active: true }]
+const sidebarItems = [
+  { icon: '📊', label: 'Dashboard', path: '/' },
+  { icon: '🔄', label: 'Swap into One', path: '/swap-into-one' },
+]
+
+const isNavItemActive = (path: string) => {
+  if (path === '/') return route.path === '/'
+  return route.path.startsWith(path)
+}
 
 const SHOW_TEST_NOTIFICATIONS = false
 
@@ -83,9 +93,9 @@ onUnmounted(() => {
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <div class="logo">
+        <NuxtLink to="/" class="logo">
           <span class="logo-text">Web3 Dashboard</span>
-        </div>
+        </NuxtLink>
       </div>
 
       <div class="header-right">
@@ -137,7 +147,7 @@ onUnmounted(() => {
         :key="item.path"
         :to="item.path"
         class="bottom-nav-item"
-        :class="{ active: item.active }"
+        :class="{ active: isNavItemActive(item.path) }"
       >
         <span class="bottom-nav-icon">{{ item.icon }}</span>
         <span class="bottom-nav-label">{{ item.label }}</span>
@@ -184,6 +194,12 @@ onUnmounted(() => {
   font-weight: 600;
   font-size: 18px;
   color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.logo:hover {
+  color: var(--accent-primary);
 }
 
 .logo-icon {

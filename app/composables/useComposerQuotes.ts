@@ -103,7 +103,14 @@ export function useComposerQuotes(options: UseComposerQuotesOptions) {
       const paramsKey = buildTokenParamsKey(t)
       const existing = currentQuotes[k]
 
-      if (existing && 'paramsKey' in existing && existing.paramsKey === paramsKey) {
+      // Skip only when we have a resolved quote (ok/error) with same params.
+      // Do not skip 'loading' — a previous run may be superseded and its results discarded.
+      if (
+        existing &&
+        'paramsKey' in existing &&
+        existing.paramsKey === paramsKey &&
+        existing.status !== 'loading'
+      ) {
         continue
       }
 

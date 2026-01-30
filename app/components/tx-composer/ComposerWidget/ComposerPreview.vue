@@ -15,6 +15,10 @@ const props = defineProps<{
 
   amountDrafts: Record<string, string>
 
+  defaultSelectionPercent: number
+  setDefaultSelectionPercent: (pct: number) => void
+  applyDefaultPercentToAllSelected: () => void
+
   tokenKey: (t: { chainId: number; address: string }) => string
   toggleToken: (t: ComposerToken) => void
   commitAmountDraft: (t: ComposerToken) => void
@@ -36,6 +40,34 @@ const emit = defineEmits<{
 }>()
 
 const formatUsdValue = (value: number) => formatUsdValueParts(value)
+
+function onSendDefaultInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  // Allow digits and at most one decimal point (e.g. 0.01, 50.5, 100), max 6 chars
+  let v = input.value.replace(/[^\d.]/g, '')
+  const dots = v.match(/\./g)
+  if (dots && dots.length > 1) {
+    const firstDot = v.indexOf('.')
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '')
+  }
+  v = v.slice(0, 6)
+  input.value = v
+  const num = Number.parseFloat(v)
+  const clamped = Number.isFinite(num) ? Math.min(100, Math.max(0, num)) : 0
+  props.setDefaultSelectionPercent(clamped)
+  // Sync display when value is a complete number (avoids "0.0" → "0" while typing)
+  if (v !== '' && v !== '.' && String(clamped) === v) {
+    input.value = clamped === 100 ? '100' : String(clamped)
+  }
+}
+
+function onSendDefaultMax() {
+  props.setDefaultSelectionPercent(100)
+}
+
+function onApplyDefaultPercentToAllSelected() {
+  props.applyDefaultPercentToAllSelected()
+}
 </script>
 
 <template>
@@ -72,6 +104,60 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
       }}).
     </div>
 
+    <div class="composer-preview__table-header">
+      <div class="composer-preview__header-col composer-preview__header-col--send">
+        <span class="composer-preview__header-label">You Send</span>
+        <span class="composer-preview__send-default-label">by default</span>
+        <input
+          :value="props.defaultSelectionPercent"
+          type="text"
+          inputmode="decimal"
+          maxlength="6"
+          class="composer-preview__send-default-input"
+          aria-label="Send by default percent"
+          @input="onSendDefaultInput"
+        />
+        <span class="composer-preview__send-default-suffix">%</span>
+        <button
+          type="button"
+          class="composer-preview__send-default-max-btn"
+          @click="onSendDefaultMax"
+        >
+          MAX
+        </button>
+        <button
+          type="button"
+          class="composer-preview__send-default-refresh-btn"
+          title="Apply target % to all selected tokens"
+          aria-label="Apply target percent to all selected tokens"
+          @click="onApplyDefaultPercentToAllSelected"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+        </button>
+      </div>
+      <div
+        class="composer-preview__header-col composer-preview__header-col--arrow"
+        aria-hidden="true"
+      >
+        <span class="composer-preview__arrow" title="Swap to">→</span>
+      </div>
+      <div class="composer-preview__header-col">You Receive</div>
+    </div>
+
     <div v-if="props.selectedTokens.length === 0" class="composer-preview__empty">
       <div class="composer-preview__empty-icon">📋</div>
       <div class="composer-preview__empty-text">Select assets to preview routes</div>
@@ -85,11 +171,6 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
       <div class="composer-preview__empty-text">Select a target token</div>
     </div>
     <div v-else class="composer-preview__list">
-      <div class="composer-preview__table-header">
-        <div class="composer-preview__header-col">You Send</div>
-        <div class="composer-preview__header-col">You Receive</div>
-      </div>
-
       <div
         v-for="t in props.selectedTokens"
         :key="props.tokenKey(t)"
@@ -116,7 +197,7 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
         </button>
 
         <div class="composer-preview__columns">
-          <div class="composer-preview__column">
+          <div class="composer-preview__column composer-preview__column--send">
             <div class="composer-preview__token-row">
               <img v-if="t.logoURI" :src="t.logoURI" class="composer-preview__token-logo" alt="" />
               <div v-else class="composer-preview__token-logo-placeholder">{{ t.symbol[0] }}</div>
@@ -175,6 +256,12 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="composer-preview__column composer-preview__column--arrow" aria-hidden="true">
+            <span class="composer-preview__arrow composer-preview__arrow--row" title="Swap to"
+              >→</span
+            >
           </div>
 
           <div class="composer-preview__column composer-preview__column--receive">
@@ -327,6 +414,8 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 24px;
+  margin-top: 10px;
 }
 
 .composer-preview__header-right {
@@ -415,9 +504,10 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
 
 .composer-preview__table-header {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px 16px;
   padding: 0 10px;
+  align-items: center;
 }
 
 .composer-preview__header-col {
@@ -426,6 +516,103 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.composer-preview__header-col--send {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.composer-preview__header-label {
+  flex-shrink: 0;
+}
+
+.composer-preview__send-default-label {
+  font-size: 10px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.composer-preview__send-default-input {
+  width: 3.5em;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.composer-preview__send-default-suffix {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.composer-preview__send-default-max-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.composer-preview__send-default-max-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.composer-preview__send-default-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.composer-preview__send-default-refresh-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.composer-preview__header-col--arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.composer-preview__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted, #888);
+  line-height: 1;
+}
+
+.composer-preview__arrow--row {
+  font-size: 20px;
+  color: var(--accent-primary, mediumseagreen);
 }
 
 .composer-preview__card {
@@ -483,8 +670,8 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
 
 .composer-preview__columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px 16px;
   align-items: start;
 }
 
@@ -494,9 +681,16 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
   gap: 8px;
 }
 
+.composer-preview__column--arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  margin: auto;
+}
+
 .composer-preview__column--receive {
-  border-left: 1px solid var(--border-color);
-  padding-left: 10px;
+  padding-left: 0;
   position: relative;
 }
 
@@ -752,14 +946,17 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
 }
 
 @media (max-width: 520px) {
+  .composer-preview__table-header {
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+  }
   .composer-preview__columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
   }
   .composer-preview__column--receive {
-    border-left: none;
-    padding-left: 0;
-    border-top: 1px solid var(--border-color);
-    padding-top: 8px;
+    border-top: none;
+    padding-top: 0;
   }
 }
 </style>
