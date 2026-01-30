@@ -314,6 +314,40 @@ async function copyTokenAddress(address: string) {
   gap: 12px;
 }
 
+@media (max-width: 768px) {
+  .tokens-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .token-card {
+    padding: 14px;
+    min-height: 72px;
+  }
+
+  .chain-title-wrapper {
+    min-height: 44px;
+    padding: 4px 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .selection-indicator {
+    min-width: 40px;
+    min-height: 40px;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .token-address-btn,
+  .native-info-btn {
+    min-height: 36px;
+    padding: 8px 10px;
+  }
+}
+
 .token-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -322,6 +356,7 @@ async function copyTokenAddress(address: string) {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .token-card:hover {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
 import type { TargetAssetMode, ResolvedToken } from './types'
 
@@ -18,7 +18,9 @@ const props = defineProps<{
   targetChainId: number | null
   targetAssetMode: TargetAssetMode
   targetAssetOptions: Array<{ id: string; label: string; icon?: string }>
-  selectTargetAsset: (mode: TargetAssetMode) => void
+  selectedTargetOptionId: string
+  selectTargetAsset: (modeOrAddress: string) => void
+  selectCustomToken: (token: ResolvedToken) => void
 
   // Contract address + copy
   targetTokenAddress: string | null
@@ -26,12 +28,8 @@ const props = defineProps<{
   shortenAddress: (addr: string) => string
   copyAddress: (addr: string) => Promise<void>
 
-  // Custom token resolver
-  customTokenAddressInput: string
+  // Resolved custom token (from dropdown preset or modal)
   resolvedCustomToken: ResolvedToken | null
-  isResolvingCustomToken: boolean
-  customTokenError: string | null
-  resolveCustomToken: () => Promise<void>
   targetTokenLabel: string
 
   // Batch settings
@@ -43,11 +41,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:show-target-chain-filter', v: boolean): void
-  (e: 'update:custom-token-address-input', v: string): void
   (e: 'update:use-batching', v: boolean): void
 }>()
 
 const showTargetAssetDropdown = ref(false)
+const showTokenSelectModal = ref(false)
+
+const selectedOption = computed(() =>
+  props.targetAssetOptions.find(o => o.id === props.selectedTargetOptionId)
+)
+
+function onSelectTargetOption(optionId: string) {
+  if (optionId === 'custom') {
+    showTokenSelectModal.value = true
+    showTargetAssetDropdown.value = false
+    return
+  }
+  props.selectTargetAsset(optionId)
+  showTargetAssetDropdown.value = false
+}
+
+function onSelectTokenFromModal(token: ResolvedToken) {
+  props.selectCustomToken(token)
+  showTokenSelectModal.value = false
+}
 const targetAssetDropdownRef = ref<HTMLElement | null>(null)
 
 const handleClickOutsideDropdown = (event: MouseEvent) => {
@@ -94,7 +111,10 @@ onUnmounted(() => {
         <div class="composer-target-controls__label-with-address">
           <label class="composer-target-controls__label">to asset</label>
           <div
-            v-if="props.targetAssetMode === 'usdc' && props.targetTokenAddress"
+            v-if="
+              (props.targetAssetMode === 'usdc' || props.resolvedCustomToken) &&
+              props.targetTokenAddress
+            "
             class="composer-target-controls__inline-address"
           >
             <button
@@ -160,12 +180,18 @@ onUnmounted(() => {
             >
               <div class="composer-target-controls__trigger-content">
                 <img
-                  v-if="props.targetAssetOptions.find(o => o.id === props.targetAssetMode)?.icon"
-                  :src="props.targetAssetOptions.find(o => o.id === props.targetAssetMode)?.icon"
+                  v-if="selectedOption?.icon"
+                  :src="selectedOption.icon"
                   class="composer-target-controls__option-icon"
                 />
+                <div
+                  v-else-if="selectedOption?.id === 'custom'"
+                  class="composer-target-controls__option-icon-placeholder"
+                >
+                  ?
+                </div>
                 <span class="composer-target-controls__trigger-label">{{
-                  props.targetAssetOptions.find(o => o.id === props.targetAssetMode)?.label
+                  selectedOption?.label ?? props.targetTokenLabel
                 }}</span>
               </div>
               <span
@@ -185,9 +211,9 @@ onUnmounted(() => {
                 class="composer-target-controls__dropdown-option"
                 :class="{
                   'composer-target-controls__dropdown-option--selected':
-                    props.targetAssetMode === option.id,
+                    props.selectedTargetOptionId === option.id,
                 }"
-                @click="props.selectTargetAsset(option.id as TargetAssetMode)"
+                @click="onSelectTargetOption(option.id)"
               >
                 <img
                   v-if="option.icon"
@@ -202,7 +228,7 @@ onUnmounted(() => {
                 </div>
                 <span class="composer-target-controls__option-label">{{ option.label }}</span>
                 <span
-                  v-if="props.targetAssetMode === option.id"
+                  v-if="props.selectedTargetOptionId === option.id"
                   class="composer-target-controls__checkmark"
                   >✓</span
                 >
@@ -233,45 +259,31 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="props.targetAssetMode === 'custom'"
-      class="composer-target-controls__custom-token-box"
+      v-if="props.targetAssetMode === 'custom' && props.resolvedCustomToken"
+      class="composer-target-controls__resolved-token-row"
     >
-      <input
-        :value="props.customTokenAddressInput"
-        type="text"
-        placeholder="0x… token address"
-        spellcheck="false"
-        autocapitalize="off"
-        autocomplete="off"
-        class="composer-target-controls__compact-input"
-        @input="
-          emit('update:custom-token-address-input', ($event.target as HTMLInputElement).value)
-        "
-      />
-      <button
-        class="composer-target-controls__secondary-btn"
-        :disabled="props.isResolvingCustomToken || props.targetChainId === null"
-        @click="props.resolveCustomToken"
-      >
-        {{ props.isResolvingCustomToken ? 'Resolving…' : 'Resolve' }}
-      </button>
-
-      <div v-if="props.resolvedCustomToken" class="composer-target-controls__resolved-token">
+      <div class="composer-target-controls__resolved-token">
         <div class="composer-target-controls__resolved-header">
           <span class="composer-target-controls__resolved-title">{{ props.targetTokenLabel }}</span>
           <button
             class="composer-target-controls__token-address-btn composer-target-controls__token-address-btn--mini"
             :class="{
               'composer-target-controls__token-address-btn--copied':
-                props.copiedAddress === props.resolvedCustomToken.address,
+                props.copiedAddress === props.resolvedCustomToken?.address,
             }"
-            @click="props.copyAddress(props.resolvedCustomToken.address)"
+            @click="
+              props.resolvedCustomToken && props.copyAddress(props.resolvedCustomToken.address)
+            "
           >
             <span class="composer-target-controls__token-address">
-              {{ props.shortenAddress(props.resolvedCustomToken.address) }}
+              {{
+                props.resolvedCustomToken
+                  ? props.shortenAddress(props.resolvedCustomToken.address)
+                  : ''
+              }}
             </span>
             <svg
-              v-if="props.copiedAddress === props.resolvedCustomToken.address"
+              v-if="props.copiedAddress === props.resolvedCustomToken?.address"
               width="10"
               height="10"
               viewBox="0 0 16 16"
@@ -304,10 +316,15 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
-      <div v-else-if="props.customTokenError" class="composer-target-controls__error-text">
-        {{ props.customTokenError }}
-      </div>
     </div>
+
+    <TxComposerTokenSelectModal
+      :open="showTokenSelectModal"
+      :chain-id="props.targetChainId"
+      :current-token-address="props.targetTokenAddress"
+      @select="onSelectTokenFromModal"
+      @close="showTokenSelectModal = false"
+    />
   </div>
 </template>
 
@@ -469,33 +486,11 @@ onUnmounted(() => {
   transform: rotate(180deg);
 }
 
-.composer-target-controls__custom-token-box {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.composer-target-controls__compact-input {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.composer-target-controls__secondary-btn {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  cursor: pointer;
+.composer-target-controls__resolved-token-row {
+  margin-top: 4px;
 }
 
 .composer-target-controls__resolved-token {
-  grid-column: 1 / -1;
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
@@ -558,7 +553,26 @@ onUnmounted(() => {
 .composer-target-controls__error-text {
   color: var(--danger, #ef4444);
   font-size: 12px;
-  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .composer-target-controls__dropdown-trigger {
+    min-height: 48px;
+    padding: 12px 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .composer-target-controls__dropdown-option {
+    min-height: 48px;
+    padding: 12px 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .composer-target-controls__checkbox-label {
+    min-height: 44px;
+    padding: 10px 0;
+    align-items: center;
+  }
 }
 
 @media (max-width: 520px) {

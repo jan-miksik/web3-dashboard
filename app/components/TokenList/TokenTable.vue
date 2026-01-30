@@ -103,6 +103,7 @@ const emit = defineEmits<{
   margin: 20px -20px;
   padding: 0 20px;
   transition: opacity 0.3s ease;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-container.refreshing {
@@ -184,6 +185,20 @@ const emit = defineEmits<{
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+  .show-low-value-btn,
+  .hide-low-value-btn {
+    min-height: 44px;
+    padding: 12px 20px;
+  }
+
+  .table-container {
+    margin: 16px -16px;
+    padding: 0 16px;
+  }
 }
 
 .show-low-value-btn:hover,

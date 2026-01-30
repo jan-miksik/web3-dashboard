@@ -575,11 +575,36 @@ onUnmounted(() => {
     max-width: 100%;
     margin: 0;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 85vh;
+    max-height: calc(85dvh);
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  .modal-body {
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0));
+  }
+
+  .address-input {
+    min-height: 48px;
+    padding: 14px 16px;
+    font-size: 16px;
+  }
+
+  .clear-btn {
+    min-height: 48px;
+    padding: 12px 20px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .connect-button-wrapper {
+    min-height: 48px;
   }
 }
 </style>

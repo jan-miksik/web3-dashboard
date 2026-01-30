@@ -41,6 +41,7 @@ function handleConnectClick() {
   gap: 8px;
   width: 100%;
   padding: 12px 24px;
+  min-height: 44px;
   background: var(--accent-primary);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -49,6 +50,7 @@ function handleConnectClick() {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .connect-button:hover {

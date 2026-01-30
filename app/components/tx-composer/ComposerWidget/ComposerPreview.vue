@@ -500,6 +500,7 @@ function onApplyDefaultPercentToAllSelected() {
   overscroll-behavior: contain;
   min-height: 0;
   padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .composer-preview__table-header {
@@ -942,6 +943,58 @@ function onApplyDefaultPercentToAllSelected() {
   30% {
     transform: translateY(-4px);
     opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .composer-preview__header {
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    margin-top: 8px;
+  }
+
+  .composer-preview__header-right {
+    width: 100%;
+    order: 3;
+    margin-top: 4px;
+  }
+
+  .composer-preview__details-toggle {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .composer-preview__details-toggle-input {
+    width: 18px;
+    height: 18px;
+  }
+
+  .composer-preview__cancel-btn {
+    width: 36px;
+    height: 36px;
+    top: 8px;
+    right: 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .composer-preview__card {
+    padding: 12px;
+    padding-right: 48px;
+  }
+
+  .composer-preview__send-default-max-btn,
+  .composer-preview__send-default-refresh-btn {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .composer-preview__send-default-input {
+    min-height: 36px;
+    padding: 8px 10px;
+    font-size: 16px;
   }
 }
 

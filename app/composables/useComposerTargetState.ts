@@ -4,7 +4,7 @@ import { useConfig, type Config } from '@wagmi/vue'
 import { isAddress, parseAbi, zeroAddress, type Address } from 'viem'
 import { CHAIN_METADATA, type ChainMetadata } from '~/utils/chains'
 import { handleError } from '~/utils/error-handler'
-import { getGasTokenName, getUSDCAddress } from '~/utils/tokenAddresses'
+import { getCommonTokens, getGasTokenName, getUSDCAddress } from '~/utils/tokenAddresses'
 import type { ResolvedToken, TargetAssetMode } from '~/components/tx-composer/ComposerWidget/types'
 
 type TokenWithChainAndUsd = { chainId: number; usdValue: number }
@@ -162,7 +162,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   }
 
   const targetAssetOptions = computed(() => {
-    return [
+    const options: Array<{ id: string; label: string; icon?: string }> = [
       {
         id: 'native',
         label: `${gasTokenName.value} (Native)`,
@@ -173,16 +173,60 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
         label: 'USDC',
         icon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png',
       },
-      {
-        id: 'custom',
-        label: 'Custom token address',
-        icon: undefined,
-      },
     ]
+    const common = targetChainId.value !== null ? getCommonTokens(targetChainId.value) : []
+    common.forEach(t => {
+      options.push({
+        id: t.address,
+        label: t.symbol,
+        icon: t.logoURI,
+      })
+    })
+    options.push({
+      id: 'custom',
+      label: 'Search or custom…',
+      icon: undefined,
+    })
+    return options
   })
 
-  const selectTargetAsset = (mode: TargetAssetMode) => {
-    targetAssetMode.value = mode
+  /** Id of the currently selected dropdown option (native | usdc | address | custom) */
+  const selectedTargetOptionId = computed(() => {
+    if (targetAssetMode.value === 'native') return 'native'
+    if (targetAssetMode.value === 'usdc') return 'usdc'
+    if (targetAssetMode.value === 'custom' && resolvedCustomToken.value)
+      return resolvedCustomToken.value.address
+    return 'custom'
+  })
+
+  const selectTargetAsset = (modeOrAddress: string) => {
+    if (modeOrAddress === 'native' || modeOrAddress === 'usdc') {
+      targetAssetMode.value = modeOrAddress
+      return
+    }
+    if (modeOrAddress === 'custom') {
+      targetAssetMode.value = 'custom'
+      return
+    }
+    const chainId = targetChainId.value
+    if (chainId === null) return
+    const common = getCommonTokens(chainId)
+    const token = common.find(t => t.address.toLowerCase() === modeOrAddress.toLowerCase())
+    if (token) {
+      targetAssetMode.value = 'custom'
+      resolvedCustomToken.value = {
+        address: token.address,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: token.decimals,
+        logoURI: token.logoURI,
+      }
+    }
+  }
+
+  const selectCustomToken = (token: ResolvedToken) => {
+    targetAssetMode.value = 'custom'
+    resolvedCustomToken.value = token
   }
 
   // Address copy for target token
@@ -237,7 +281,9 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     targetTokenAddress,
     targetTokenLabel,
     targetAssetOptions,
+    selectedTargetOptionId,
     selectTargetAsset,
+    selectCustomToken,
 
     // misc
     gasTokenName,

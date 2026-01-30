@@ -147,6 +147,16 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
   border-bottom: 1px solid var(--border-color);
 }
 
+@media (max-width: 768px) {
+  .token-row td {
+    padding: 14px 0;
+  }
+
+  .token-row {
+    min-height: 56px;
+  }
+}
+
 .token-row:last-child td {
   border-bottom: none;
 }
@@ -380,6 +390,18 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
   .token-logo {
     width: 32px;
     height: 32px;
+  }
+
+  .token-address-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (max-width: 768px) {
+  .token-row {
+    cursor: pointer;
   }
 }
 </style>

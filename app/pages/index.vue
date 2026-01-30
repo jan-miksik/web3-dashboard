@@ -18,58 +18,28 @@
         <NuxtLink to="/swap-into-one" class="dashboard__swap-cta">
           <span class="dashboard__swap-cta-icon" aria-hidden="true">
             <svg
-              width="30"
-              height="24"
-              viewBox="0 0 30 24"
+              width="26"
+              height="20"
+              viewBox="0 0 26 20"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               aria-hidden="true"
             >
-              <!-- Three source circles -->
-              <circle cx="2.75" cy="3" r="1.75" stroke="currentColor" stroke-width="1.25" />
-              <circle cx="2.75" cy="12" r="1.75" stroke="currentColor" stroke-width="1.25" />
-              <circle cx="2.75" cy="21" r="1.75" stroke="currentColor" stroke-width="1.25" />
-              <!-- Lines from circles to funnel -->
+              <!-- Many: three dots -->
+              <circle cx="4" cy="4" r="1.5" fill="currentColor" />
+              <circle cx="4" cy="10" r="1.5" fill="currentColor" />
+              <circle cx="4" cy="16" r="1.5" fill="currentColor" />
+              <!-- Lines converging into one -->
               <path
-                d="M4.5 4.5L9.5 9.5"
-                stroke="currentColor"
-                stroke-width="1.25"
-                stroke-linecap="round"
-              />
-              <path
-                d="M4.5 12H9.5"
-                stroke="currentColor"
-                stroke-width="1.25"
-                stroke-linecap="round"
-              />
-              <path
-                d="M4.5 19.5L9.5 14.5"
-                stroke="currentColor"
-                stroke-width="1.25"
-                stroke-linecap="round"
-              />
-              <!-- Funnel chevron -->
-              <path
-                d="M9.5 9.5L13 12L9.5 14.5Z"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                fill="currentColor"
-                fill-opacity="0.1"
-              />
-              <!-- Output line -->
-              <path d="M13 12H22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              <!-- Arrowhead -->
-              <path
-                d="M20 9.5L23 12L20 14.5"
+                d="M5.5 5L12 10M5.5 10H12M5.5 15L12 10"
                 stroke="currentColor"
                 stroke-width="1.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-              <!-- Destination circle (outlined) -->
-              <circle cx="26.5" cy="12" r="2.75" stroke="currentColor" stroke-width="1.75" />
+              <path d="M12 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <!-- One -->
+              <circle cx="22" cy="10" r="2" stroke="currentColor" stroke-width="1.5" />
             </svg>
           </span>
           <span class="dashboard__swap-cta-label">Swap into one</span>
@@ -154,6 +124,7 @@
   gap: 8px;
   padding: 16px 20px;
   min-width: 120px;
+  min-height: 44px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -164,6 +135,7 @@
     border-color 0.2s ease,
     background 0.2s ease,
     box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dashboard__swap-cta:hover {
@@ -217,6 +189,11 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard {
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
   .dashboard-header {
     margin-bottom: 24px;
   }
@@ -247,6 +224,8 @@
     flex-direction: row;
     min-width: unset;
     width: 100%;
+    min-height: 56px;
+    padding: 16px 20px;
     justify-content: center;
     gap: 10px;
   }

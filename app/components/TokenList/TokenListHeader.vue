@@ -103,6 +103,7 @@ const emit = defineEmits<{
   width: 36px;
   height: 36px;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -143,6 +144,19 @@ const emit = defineEmits<{
 @media (max-width: 640px) {
   .total-value {
     font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .refresh-btn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .header-actions {
+    gap: 8px;
   }
 }
 </style>

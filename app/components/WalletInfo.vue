@@ -339,4 +339,12 @@ async function copyAddress() {
   color: var(--text-secondary);
   font-size: 14px;
 }
+
+@media (max-width: 768px) {
+  .copy-btn {
+    min-height: 44px;
+    padding: 10px 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
 </style>

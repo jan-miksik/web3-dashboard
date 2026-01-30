@@ -166,6 +166,7 @@ const formatBalance = (val: number | undefined) => {
   white-space: nowrap;
   width: 100%;
   justify-content: space-between;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .network-filter-btn:hover {
@@ -229,6 +230,7 @@ const formatBalance = (val: number | undefined) => {
   flex-direction: column;
   padding: 4px;
   min-width: 220px;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (min-width: 1024px) {
@@ -249,6 +251,7 @@ const formatBalance = (val: number | undefined) => {
   cursor: pointer;
   text-align: left;
   transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .filter-option:hover {
@@ -333,5 +336,19 @@ const formatBalance = (val: number | undefined) => {
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+@media (max-width: 768px) {
+  .network-filter-dropdown {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-height: min(60vh, 320px);
+  }
+
+  .filter-option {
+    min-height: 48px;
+    padding: 14px 16px;
+  }
 }
 </style>

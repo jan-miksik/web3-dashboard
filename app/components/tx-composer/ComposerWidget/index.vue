@@ -59,15 +59,13 @@ const {
   onClearTargetChain,
   targetChainId,
   targetAssetMode,
-  customTokenAddressInput,
   resolvedCustomToken,
-  isResolvingCustomToken,
-  customTokenError,
-  resolveCustomToken,
   targetTokenAddress,
   targetTokenLabel,
   targetAssetOptions,
+  selectedTargetOptionId,
   selectTargetAsset,
+  selectCustomToken,
   copiedAddress,
   shortenAddress,
   copyAddress,
@@ -297,23 +295,20 @@ const getTargetChainName = () => {
         :target-chain-id="targetChainId"
         :target-asset-mode="targetAssetMode"
         :target-asset-options="targetAssetOptions"
+        :selected-target-option-id="selectedTargetOptionId"
         :select-target-asset="selectTargetAsset"
+        :select-custom-token="selectCustomToken"
         :target-token-address="targetTokenAddress"
         :copied-address="copiedAddress"
         :shorten-address="shortenAddress"
         :copy-address="copyAddress"
-        :custom-token-address-input="customTokenAddressInput"
         :resolved-custom-token="resolvedCustomToken"
-        :is-resolving-custom-token="isResolvingCustomToken"
-        :custom-token-error="customTokenError"
-        :resolve-custom-token="resolveCustomToken"
         :target-token-label="targetTokenLabel"
         :is-checking-support="isCheckingSupport"
         :supports-batching="supportsBatching"
         :use-batching="useBatching"
         :batch-method="batchMethod"
         @update:show-target-chain-filter="showTargetChainFilter = $event"
-        @update:custom-token-address-input="customTokenAddressInput = $event"
         @update:use-batching="useBatching = $event"
       />
 
@@ -384,6 +379,29 @@ const getTargetChainName = () => {
   flex-direction: column;
 }
 
+@media (max-width: 768px) {
+  .composer-widget {
+    position: relative;
+    top: 0;
+    max-height: none;
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .composer-widget__controls {
+    gap: 12px;
+  }
+
+  .composer-widget__execute-btn {
+    min-height: 52px;
+    padding: 14px 24px;
+    font-size: 16px;
+    margin-top: 12px;
+    border-radius: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 .composer-widget__controls {
   display: flex;
   flex-direction: column;
@@ -412,6 +430,7 @@ const getTargetChainName = () => {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .composer-widget__execute-btn:disabled {
