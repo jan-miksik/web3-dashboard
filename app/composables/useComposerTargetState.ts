@@ -184,7 +184,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     })
     options.push({
       id: 'custom',
-      label: 'Search or custom…',
+      label: 'Search',
       icon: undefined,
     })
     return options
@@ -206,6 +206,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     }
     if (modeOrAddress === 'custom') {
       targetAssetMode.value = 'custom'
+      resolvedCustomToken.value = null
       return
     }
     const chainId = targetChainId.value

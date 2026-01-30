@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import { useTokens } from '~/composables/useTokens'
+import { clearBatchCapabilitiesCache } from '~/composables/useBatchTransaction'
 import { handleError } from '~/utils/error-handler'
 
 const { address, isConnected } = useConnection()
@@ -65,6 +66,27 @@ async function copyAddress() {
     }
   }
 }
+
+const isBatchCacheCleared = ref(false)
+let batchCacheClearTimeout: ReturnType<typeof setTimeout> | null = null
+
+function onClearBatchingCache() {
+  clearBatchCapabilitiesCache()
+  isBatchCacheCleared.value = true
+
+  if (batchCacheClearTimeout) {
+    clearTimeout(batchCacheClearTimeout)
+  }
+
+  batchCacheClearTimeout = setTimeout(() => {
+    isBatchCacheCleared.value = false
+  }, 2000)
+}
+
+onUnmounted(() => {
+  if (copyTimeout) clearTimeout(copyTimeout)
+  if (batchCacheClearTimeout) clearTimeout(batchCacheClearTimeout)
+})
 </script>
 
 <template>
@@ -153,6 +175,19 @@ async function copyAddress() {
           {{ formatTotalValue(totalUsdValue) }}
         </span>
       </div>
+
+      <div class="detail-row wallet-info__cache-row">
+        <span class="detail-label">Batching cache</span>
+        <button
+          class="wallet-info__cache-clear-btn"
+          type="button"
+          :class="{ 'wallet-info__cache-clear-btn--cleared': isBatchCacheCleared }"
+          :title="isBatchCacheCleared ? 'Cleared' : 'Clear cached wallet batching capabilities'"
+          @click="onClearBatchingCache"
+        >
+          {{ isBatchCacheCleared ? 'Cleared' : 'Clear' }}
+        </button>
+      </div>
     </div>
 
     <div v-else class="wallet-disconnected">
@@ -200,6 +235,34 @@ async function copyAddress() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.wallet-info__cache-row {
+  margin-top: 4px;
+}
+
+.wallet-info__cache-clear-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.wallet-info__cache-clear-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.wallet-info__cache-clear-btn--cleared {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .detail-row {
@@ -340,7 +403,7 @@ async function copyAddress() {
   font-size: 14px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .copy-btn {
     min-height: 44px;
     padding: 10px 14px;

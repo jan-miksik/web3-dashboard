@@ -577,7 +577,6 @@ onUnmounted(() => {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     max-height: 85vh;
     max-height: calc(85dvh);
-    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   .modal-overlay {

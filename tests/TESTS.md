@@ -32,14 +32,14 @@ These files are excluded from the coverage report because they require a full ru
 - **app/utils/wagmi.ts** — Config singleton
 - **app/components/NetworkFilter.vue, ConnectWalletModal.vue** — Complex wallet/chain UI
 
-We still **run** unit tests that import these (e.g. `useBatchTransaction.test.ts` validates constants).
+We still **run** unit tests that import these composables (e.g. `useTokens.test.ts`, `useBatchTransaction.test.ts`) for testable logic such as constants, parsing, and validation; they are excluded from coverage because they include untestable runtime dependencies (Wagmi, LI.FI). So: tests run, coverage is excluded for those files.
 
 ## What We Don’t Test
 
 - **Plugins** (appkit, wagmi): Integration points with external libs; better covered by E2E.
 - **LI.FI / swap execution**: Requires live SDK; E2E or integration tests are more appropriate.
 - **Every optional schema field**: Zerion schemas have many optional fields; we test the critical paths (required fields, invalid types, API response shape).
-- **Trivial getters**: e.g. testing that `WALLET_BATCH_LIMITS.metamask === 10` without additional value—we test structure and invariants instead.
+- **Literal constant assertions**: We do not assert specific constant values (e.g. `WALLET_BATCH_LIMITS.metamask === 10`) for their own sake. Instead we test the **structure and enforcement** of wallet batch limits: that the batch composition logic in `useBatchTransaction` applies limits from `WALLET_BATCH_LIMITS` when forming batches (see `useBatchTransaction.test.ts`). Readers should understand we are testing behavior and invariants, not literal constant values.
 
 ## Running Tests
 

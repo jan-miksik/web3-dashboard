@@ -79,7 +79,7 @@ describe('useComposerAmountDrafts', () => {
     const { commitAmountDraft, amountDrafts, onUpdateAmountDraft } = useComposerAmountDrafts({
       selectedTokens,
       tokenKey,
-      getEffectiveAmount: t => customAmounts.value[tokenKey(token)] ?? t.balance,
+      getEffectiveAmount: t => customAmounts.value[tokenKey(t)] ?? t.balance,
       setCustomAmount: (t, raw) => {
         customAmounts.value[tokenKey(t)] = raw
       },

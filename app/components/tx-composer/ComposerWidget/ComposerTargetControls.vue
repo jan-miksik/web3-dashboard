@@ -184,11 +184,10 @@ onUnmounted(() => {
                   :src="selectedOption.icon"
                   class="composer-target-controls__option-icon"
                 />
-                <div
-                  v-else-if="selectedOption?.id === 'custom'"
-                  class="composer-target-controls__option-icon-placeholder"
-                >
-                  ?
+                <div v-else class="composer-target-controls__option-icon-placeholder">
+                  {{
+                    selectedOption?.id === 'custom' ? '?' : (selectedOption?.label?.charAt(0) ?? '')
+                  }}
                 </div>
                 <span class="composer-target-controls__trigger-label">{{
                   selectedOption?.label ?? props.targetTokenLabel
@@ -220,11 +219,8 @@ onUnmounted(() => {
                   :src="option.icon"
                   class="composer-target-controls__option-icon"
                 />
-                <div
-                  v-else-if="option.id === 'custom'"
-                  class="composer-target-controls__option-icon-placeholder"
-                >
-                  ?
+                <div v-else class="composer-target-controls__option-icon-placeholder">
+                  {{ option.id === 'custom' ? '?' : (option.label?.charAt(0) ?? '') }}
                 </div>
                 <span class="composer-target-controls__option-label">{{ option.label }}</span>
                 <span

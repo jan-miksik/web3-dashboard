@@ -104,6 +104,88 @@ export interface BatchTransactionResult {
 }
 
 // ============================================================================
+// Capabilities Cache (localStorage)
+// ============================================================================
+
+const BATCH_CAPABILITIES_CACHE_STORAGE_KEY = 'web3_dashboard_batch_caps_cache_v1'
+const BATCH_CAPABILITIES_CACHE_TTL_MS = 1000 * 60 * 60 * 24 // 1 day
+
+type BatchCapabilitiesCacheEntry = {
+  cachedAt: number
+  caps: BatchCapabilities
+}
+
+type BatchCapabilitiesCacheStore = Record<string, BatchCapabilitiesCacheEntry>
+
+const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined'
+
+const cacheKeyFor = (provider: WalletProvider, addr: Address, cid: number) =>
+  `${provider}:${addr.toLowerCase()}:eip155:${cid}`
+
+const readCapsCache = (): BatchCapabilitiesCacheStore => {
+  if (!isBrowser()) return {}
+  try {
+    const raw = localStorage.getItem(BATCH_CAPABILITIES_CACHE_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed as BatchCapabilitiesCacheStore
+  } catch {
+    return {}
+  }
+}
+
+const writeCapsCache = (store: BatchCapabilitiesCacheStore) => {
+  if (!isBrowser()) return
+  try {
+    localStorage.setItem(BATCH_CAPABILITIES_CACHE_STORAGE_KEY, JSON.stringify(store))
+  } catch {
+    // ignore quota / serialization errors
+  }
+}
+
+const getCachedCaps = (
+  provider: WalletProvider,
+  addr: Address,
+  cid: number
+): BatchCapabilities | null => {
+  const store = readCapsCache()
+  const key = cacheKeyFor(provider, addr, cid)
+  const entry = store[key]
+  if (!entry) return null
+
+  const age = Date.now() - Number(entry.cachedAt ?? 0)
+  if (!Number.isFinite(age) || age > BATCH_CAPABILITIES_CACHE_TTL_MS) {
+    delete store[key]
+    writeCapsCache(store)
+    return null
+  }
+
+  return entry.caps ?? null
+}
+
+const setCachedCaps = (
+  provider: WalletProvider,
+  addr: Address,
+  cid: number,
+  caps: BatchCapabilities
+) => {
+  const store = readCapsCache()
+  const key = cacheKeyFor(provider, addr, cid)
+  store[key] = { cachedAt: Date.now(), caps }
+  writeCapsCache(store)
+}
+
+export const clearBatchCapabilitiesCache = () => {
+  if (!isBrowser()) return
+  try {
+    localStorage.removeItem(BATCH_CAPABILITIES_CACHE_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+// ============================================================================
 // EIP-5792 Version Detection
 // ============================================================================
 
@@ -499,6 +581,20 @@ export function useBatchTransaction() {
       const provider = detectWalletProvider()
       walletProvider.value = provider
 
+      // Capabilities can be chain-dependent (EIP-5792), so cache per (provider, address, chainId)
+      const addr = address.value
+      const cid = targetChainId ?? chainId.value
+      if (addr && cid) {
+        const cached = getCachedCaps(provider, addr, cid)
+        if (cached) {
+          capabilities.value = cached
+          walletType.value = cached.walletType
+          walletProvider.value = cached.walletProvider
+          logger.info('Batch capabilities cache hit', { provider, chainId: cid })
+          return cached
+        }
+      }
+
       // Detect wallet type
       const type = await detectWalletType()
       walletType.value = type
@@ -543,6 +639,10 @@ export function useBatchTransaction() {
       capabilities.value = caps
 
       logger.info('Batch capabilities detected', { ...caps })
+
+      if (addr && cid) {
+        setCachedCaps(provider, addr, cid, caps)
+      }
 
       return caps
     } finally {
@@ -942,6 +1042,7 @@ export function useBatchTransaction() {
     isSmartWallet,
 
     // Methods
+    clearBatchCapabilitiesCache,
     detectCapabilities,
     detectWalletType,
     detectWalletProvider,

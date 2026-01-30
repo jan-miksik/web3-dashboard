@@ -437,7 +437,7 @@ onUnmounted(() => {
     padding-left: calc(16px + env(safe-area-inset-left, 0px));
     padding-right: calc(16px + env(safe-area-inset-right, 0px));
     padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-    min-height: calc(100vh - 64px - 88px);
+    min-height: calc(100vh - 56px - 88px);
   }
 
   .header {

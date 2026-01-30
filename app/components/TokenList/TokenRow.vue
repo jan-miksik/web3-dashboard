@@ -151,10 +151,6 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
   .token-row td {
     padding: 14px 0;
   }
-
-  .token-row {
-    min-height: 56px;
-  }
 }
 
 .token-row:last-child td {
@@ -396,12 +392,6 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
     min-height: 36px;
     padding: 6px 10px;
     -webkit-tap-highlight-color: transparent;
-  }
-}
-
-@media (max-width: 768px) {
-  .token-row {
-    cursor: pointer;
   }
 }
 </style>

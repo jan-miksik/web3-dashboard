@@ -56,24 +56,32 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/assets/0x4200000000000000000000000000000000000006/logo.png',
     },
     {
       address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/assets/0x94b008aA00579c1307B0EF2c499aD98a8ce58e58/logo.png',
     },
     {
       address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/assets/0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1/logo.png',
     },
     {
       address: '0x68f180fcCe6836688e9084f035309E29Bf0A2095',
       symbol: 'WBTC',
       name: 'Wrapped BTC',
       decimals: 8,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png',
     },
   ],
   100: [
@@ -82,18 +90,24 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/xdai/assets/0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1/logo.png',
     },
     {
       address: '0x4ECaBa5870353805a9F068101A40E0f32ed605C6',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/xdai/assets/0x4ECaBa5870353805a9F068101A40E0f32ed605C6/logo.png',
     },
     {
       address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d',
       symbol: 'WXDAI',
       name: 'Wrapped xDAI',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/xdai/assets/0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d/logo.png',
     },
   ],
   137: [
@@ -102,24 +116,32 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/assets/0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619/logo.png',
     },
     {
       address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/assets/0xc2132D05D31c914a87C6611C10748AEb04B58e8F/logo.png',
     },
     {
       address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/assets/0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063/logo.png',
     },
     {
       address: '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BdD6',
       symbol: 'WBTC',
       name: 'Wrapped BTC',
       decimals: 8,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png',
     },
   ],
   250: [
@@ -128,18 +150,24 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WFTM',
       name: 'Wrapped FTM',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/assets/0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83/logo.png',
     },
     {
       address: '0x049d68029688eAbF473097a2fC38ef61633A3C7A',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/assets/0x049d68029688eAbF473097a2fC38ef61633A3C7A/logo.png',
     },
     {
       address: '0x8D11eC38a3EB5E95605205251047D7eA92127343',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/assets/0x8D11eC38a3EB5E95605205251047D7eA92127343/logo.png',
     },
   ],
   324: [
@@ -148,12 +176,16 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/zksync/assets/0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91/logo.png',
     },
     {
       address: '0x493257fD37EDB34451f62EDf8D2A0C418852bA4C',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/zksync/assets/0x493257fD37EDB34451f62EDf8D2A0C418852bA4C/logo.png',
     },
   ],
   42220: [
@@ -162,18 +194,24 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celo/assets/0x122013fd7dF61Cb636ceDd02939d5723037C9b94/logo.png',
     },
     {
       address: '0x617f3112bf5397D0467D315cC709EF968D9ba546',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celo/assets/0x617f3112bf5397D0467D315cC709EF968D9ba546/logo.png',
     },
     {
       address: '0xEadf4A7168A82D30Ba0619e64d5BCF5B30B2098B',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celo/assets/0xEadf4A7168A82D30Ba0619e64d5BCF5B30B2098B/logo.png',
     },
   ],
   43114: [
@@ -182,24 +220,32 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/assets/0x49D5c2BdFfac6CE2BFB664304f494ee94e083d7d/logo.png',
     },
     {
       address: '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/assets/0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7/logo.png',
     },
     {
       address: '0xd586E7F844cEa2F87f50152665bcbc2C279D8d70',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/assets/0xd586E7F844cEa2F87f50152665bcbc2C279D8d70/logo.png',
     },
     {
       address: '0x50b7545627a5162F82A992c33b87aDc75187B218',
       symbol: 'WBTC',
       name: 'Wrapped BTC',
       decimals: 8,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png',
     },
   ],
   8453: [
@@ -208,18 +254,24 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x4200000000000000000000000000000000000006/logo.png',
     },
     {
       address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb/logo.png',
     },
     {
       address: '0x1ceA84203673764244E05693e42E6Ace62bE9BA5',
       symbol: 'WBTC',
       name: 'Wrapped BTC',
       decimals: 8,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png',
     },
   ],
   42161: [
@@ -228,24 +280,32 @@ export const COMMON_TOKENS_BY_CHAIN: Record<number, CommonToken[]> = {
       symbol: 'WETH',
       name: 'Wrapped Ether',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0x82aF49447D8a07e3bd95BD0d56f35241523fBab1/logo.png',
     },
     {
       address: '0xFd086bC7CD5C481DCC9C85ebe478A1C0b69Fcbb9',
       symbol: 'USDT',
       name: 'Tether USD',
       decimals: 6,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0xFd086bC7CD5C481DCC9C85ebe478A1C0b69Fcbb9/logo.png',
     },
     {
       address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
       symbol: 'DAI',
       name: 'Dai Stablecoin',
       decimals: 18,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1/logo.png',
     },
     {
       address: '0x2f2a2543B76A4166549F7aaB2e75Bef0AefC5B0f',
       symbol: 'WBTC',
       name: 'Wrapped BTC',
       decimals: 8,
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png',
     },
   ],
 }

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { getPublicClient } from '@wagmi/core'
 import { useConfig, type Config } from '@wagmi/vue'
 import { isAddress, parseAbi, type Address } from 'viem'
 import { getChainName } from '~/utils/chains'
 import { getCommonTokens } from '~/utils/tokenAddresses'
+import { useVerifiedTokenList } from '~/composables/useVerifiedTokenList'
 import type { ResolvedToken } from '~/components/tx-composer/ComposerWidget/types'
 
 const props = withDefaults(
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 
 const config = useConfig() as unknown as Config
 
+const modalRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
 const customAddressInput = ref('')
 const resolvedToken = ref<ResolvedToken | null>(null)
@@ -43,15 +45,25 @@ const commonTokens = computed(() => {
   return getCommonTokens(props.chainId)
 })
 
-const filteredTokens = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return commonTokens.value
-  return commonTokens.value.filter(
-    t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
-  )
+const { tokens: verifiedTokens, isLoading: isVerifiedListLoading } = useVerifiedTokenList({
+  chainId: computed(() => props.chainId),
 })
 
-const hasCommonTokens = computed(() => commonTokens.value.length > 0)
+/** Common tokens first, then verified list tokens not already in common (by address). All have logoURI when available. */
+const listTokens = computed((): Array<ResolvedToken & { logoURI?: string }> => {
+  const common = commonTokens.value
+  const verified = verifiedTokens.value
+  const commonAddrs = new Set(common.map(t => t.address.toLowerCase()))
+  const extra = verified.filter(t => !commonAddrs.has(t.address.toLowerCase()))
+  return [...common, ...extra]
+})
+
+const filteredTokens = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const list = listTokens.value
+  if (!q) return list
+  return list.filter(t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q))
+})
 
 async function resolveCustomToken() {
   resolvedToken.value = null
@@ -120,12 +132,15 @@ function isSelected(address: string): boolean {
 
 watch(
   () => props.open,
-  open => {
+  async open => {
     if (!open) {
       searchQuery.value = ''
       customAddressInput.value = ''
       resolvedToken.value = null
       resolveError.value = null
+    } else {
+      await nextTick()
+      modalRef.value?.focus()
     }
   }
 )
@@ -136,6 +151,8 @@ watch(
     <Transition name="token-select-modal">
       <div
         v-if="open"
+        ref="modalRef"
+        tabindex="-1"
         class="token-select-modal"
         role="dialog"
         aria-modal="true"
@@ -164,8 +181,9 @@ watch(
               v-model="searchQuery"
               type="text"
               class="token-select-modal__search-input"
-              placeholder="Search by symbol or name"
+              placeholder="Search"
               autocomplete="off"
+              aria-label="Search tokens by symbol or name"
             />
           </div>
 
@@ -174,36 +192,49 @@ watch(
           </div>
 
           <template v-else>
-            <div v-if="hasCommonTokens" class="token-select-modal__list" role="listbox">
-              <button
-                v-for="token in filteredTokens"
-                :key="token.address"
-                type="button"
-                class="token-select-modal__item"
-                :class="{
-                  'token-select-modal__item--selected': isSelected(token.address),
-                }"
-                role="option"
-                @click="selectToken(token)"
+            <div class="token-select-modal__list" role="listbox" aria-label="Token list">
+              <p
+                v-if="isVerifiedListLoading && listTokens.length === 0"
+                class="token-select-modal__loading"
               >
-                <img
-                  v-if="token.logoURI"
-                  :src="token.logoURI"
-                  :alt="token.symbol"
-                  class="token-select-modal__icon"
-                />
-                <div v-else class="token-select-modal__icon-placeholder">
-                  {{ token.symbol.slice(0, 1) }}
-                </div>
-                <div class="token-select-modal__item-info">
-                  <span class="token-select-modal__symbol">{{ token.symbol }}</span>
-                  <span class="token-select-modal__name">{{ token.name }}</span>
-                </div>
-                <span v-if="isSelected(token.address)" class="token-select-modal__check"> ✓ </span>
-              </button>
-              <p v-if="filteredTokens.length === 0" class="token-select-modal__no-results">
-                No tokens match your search.
+                Loading tokens…
               </p>
+              <template v-else>
+                <button
+                  v-for="token in filteredTokens"
+                  :key="token.address"
+                  type="button"
+                  class="token-select-modal__item"
+                  :class="{
+                    'token-select-modal__item--selected': isSelected(token.address),
+                  }"
+                  role="option"
+                  :aria-selected="isSelected(token.address)"
+                  @click="selectToken(token)"
+                >
+                  <img
+                    v-if="token.logoURI"
+                    :src="token.logoURI"
+                    :alt="token.symbol"
+                    class="token-select-modal__icon"
+                  />
+                  <div v-else class="token-select-modal__icon-placeholder">
+                    {{ token.symbol.slice(0, 1) }}
+                  </div>
+                  <div class="token-select-modal__item-info">
+                    <span class="token-select-modal__symbol">{{ token.symbol }}</span>
+                    <span class="token-select-modal__name">{{ token.name }}</span>
+                  </div>
+                  <span v-if="isSelected(token.address)" class="token-select-modal__check">
+                    ✓
+                  </span>
+                </button>
+                <p v-if="filteredTokens.length === 0" class="token-select-modal__no-results">
+                  {{
+                    searchQuery.trim() ? 'No tokens match your search.' : 'No tokens on this chain.'
+                  }}
+                </p>
+              </template>
             </div>
 
             <div class="token-select-modal__custom">
@@ -359,6 +390,7 @@ watch(
 .token-select-modal__list {
   overflow-y: auto;
   padding: 8px;
+  min-height: 120px;
   max-height: 280px;
 }
 
@@ -431,7 +463,8 @@ watch(
   font-size: 14px;
 }
 
-.token-select-modal__no-results {
+.token-select-modal__no-results,
+.token-select-modal__loading {
   padding: 16px;
   font-size: 13px;
   color: var(--text-secondary);
