@@ -22,6 +22,7 @@ const {
 } = useTxComposer()
 
 const showChainFilter = ref(false)
+const showFilters = ref(false)
 
 const minInput = computed({
   get: () => (typeof minUsdValue.value === 'number' ? String(minUsdValue.value) : ''),
@@ -168,37 +169,6 @@ onUnmounted(() => {
       </p>
     </div>
 
-    <div class="swap-into-one-page__filters">
-      <div class="swap-into-one-page__filters-first-row">
-        <div class="swap-into-one-page__filter-group">
-          <label>Min value (USD)</label>
-          <input v-model="minInput" type="number" min="0" step="0.01" placeholder="Any" />
-        </div>
-        <div class="swap-into-one-page__filter-group">
-          <label>Max value (USD)</label>
-          <input v-model="maxInput" type="number" min="0" step="0.01" placeholder="Any" />
-        </div>
-        <div class="swap-into-one-page__filter-group">
-          <label>Chain</label>
-          <NetworkFilter
-            :chains-with-assets="chainsWithAssets"
-            :chains-without-assets="chainsWithoutAssets"
-            :selected-chain-ids="selectedChainIds"
-            :selected-chains-display="selectedChainsDisplay"
-            :show-chain-filter="showChainFilter"
-            :is-chain-selected="isChainSelected"
-            :on-toggle-chain="toggleChain"
-            :on-click-all-networks="onClickAllNetworks"
-            :chain-balances="chainBalances"
-            @update:show-chain-filter="showChainFilter = $event"
-          />
-        </div>
-      </div>
-      <div v-if="hasInvalidRange" class="swap-into-one-page__range-error">
-        Min value must be ≤ max value
-      </div>
-    </div>
-
     <div v-if="isLoadingTokens" class="swap-into-one-page__loading">
       <div class="swap-into-one-page__spinner"></div>
       Loading assets…
@@ -206,7 +176,65 @@ onUnmounted(() => {
 
     <div v-else class="swap-into-one-page__content-grid">
       <div class="swap-into-one-page__left-col">
-        <TxComposerAssetList :tokens="filteredTokens" :selected-ids="selectedTokenIds" />
+        <div class="swap-into-one-page__filters">
+          <div class="swap-into-one-page__filters-toggle-row">
+            <button
+              type="button"
+              class="swap-into-one-page__filter-toggle"
+              :class="{ 'swap-into-one-page__filter-toggle--open': showFilters }"
+              :aria-expanded="showFilters"
+              aria-label="Toggle filters"
+              @click="showFilters = !showFilters"
+            >
+              <svg
+                class="swap-into-one-page__filter-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span class="swap-into-one-page__filter-toggle-label">Filters</span>
+            </button>
+          </div>
+          <Transition name="filters-slide">
+            <div v-show="showFilters" class="swap-into-one-page__filters-inputs-row">
+              <div class="swap-into-one-page__filter-group">
+                <label>Min value $</label>
+                <input v-model="minInput" type="number" min="0" step="0.01" placeholder="Any" />
+              </div>
+              <div class="swap-into-one-page__filter-group">
+                <label>Max value $</label>
+                <input v-model="maxInput" type="number" min="0" step="0.01" placeholder="Any" />
+              </div>
+              <div class="swap-into-one-page__filter-group">
+                <label>Chain</label>
+                <NetworkFilter
+                  :chains-with-assets="chainsWithAssets"
+                  :chains-without-assets="chainsWithoutAssets"
+                  :selected-chain-ids="selectedChainIds"
+                  :selected-chains-display="selectedChainsDisplay"
+                  :show-chain-filter="showChainFilter"
+                  :is-chain-selected="isChainSelected"
+                  :on-toggle-chain="toggleChain"
+                  :on-click-all-networks="onClickAllNetworks"
+                  :chain-balances="chainBalances"
+                  @update:show-chain-filter="showChainFilter = $event"
+                />
+              </div>
+            </div>
+          </Transition>
+          <div v-if="showFilters && hasInvalidRange" class="swap-into-one-page__range-error">
+            Min value must be ≤ max value
+          </div>
+        </div>
+        <div class="swap-into-one-page__assets-list-wrap">
+          <TxComposerAssetList :tokens="filteredTokens" :selected-ids="selectedTokenIds" />
+        </div>
       </div>
       <div class="swap-into-one-page__right-col">
         <TxComposerComposerWidget />
@@ -348,24 +376,108 @@ onUnmounted(() => {
   font-size: 16px;
 }
 
+.swap-into-one-page__left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
 .swap-into-one-page__filters {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 0;
+  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
-.swap-into-one-page__filters-first-row {
+.swap-into-one-page__filters-toggle-row {
+  margin-bottom: 12px;
+}
+
+.swap-into-one-page__filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swap-into-one-page__filter-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.swap-into-one-page__filter-toggle--open {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.swap-into-one-page__filter-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.swap-into-one-page__filters-inputs-row {
   display: flex;
-  gap: 16px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
   align-items: flex-end;
-  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.swap-into-one-page__filters-inputs-row .swap-into-one-page__filter-group {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Transition: filter row height + opacity so assets list slides smoothly */
+.filters-slide-enter-active,
+.filters-slide-leave-active {
+  transition:
+    max-height 0.24s ease-out,
+    opacity 0.2s ease-out,
+    margin-bottom 0.24s ease-out;
+}
+
+.filters-slide-enter-from,
+.filters-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.filters-slide-enter-to,
+.filters-slide-leave-from {
+  max-height: 120px;
+  opacity: 1;
+  margin-bottom: 12px;
+  overflow: visible;
+}
+
+.swap-into-one-page__assets-list-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: transform 0.22s ease-out;
 }
 
 .swap-into-one-page__filter-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .swap-into-one-page__filter-group label {
@@ -381,11 +493,15 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-radius: 8px;
   color: var(--text-primary);
-  width: 140px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .swap-into-one-page__filter-group :deep(.network-filter-btn) {
-  width: 140px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .swap-into-one-page__range-error {
@@ -398,9 +514,9 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 420px minmax(0, 1fr);
   gap: 32px;
+  align-items: start;
 }
 
-.swap-into-one-page__left-col,
 .swap-into-one-page__right-col {
   min-width: 0;
 }
@@ -444,9 +560,13 @@ onUnmounted(() => {
     font-size: 14px;
   }
 
-  .swap-into-one-page__filters-first-row {
+  .swap-into-one-page__filters-inputs-row {
+    flex-wrap: wrap;
     flex-direction: column;
-    gap: 12px;
+  }
+
+  .swap-into-one-page__filters-inputs-row .swap-into-one-page__filter-group {
+    width: 100%;
   }
 
   .swap-into-one-page__filter-group {

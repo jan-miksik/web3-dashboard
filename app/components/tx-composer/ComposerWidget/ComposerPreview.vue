@@ -33,6 +33,7 @@ const props = defineProps<{
 
   tokenKey: (t: { chainId: number; address: string }) => string
   toggleToken: (t: ComposerToken) => void
+  clearSelection: () => void
   commitAmountDraft: (t: ComposerToken) => void
   setMaxAmount: (t: ComposerToken) => void
 
@@ -187,7 +188,19 @@ function onApplyDefaultPercentToAllSelected() {
       >
         <span class="composer-preview__arrow" title="Swap to">→</span>
       </div>
-      <div class="composer-preview__header-col">You Receive</div>
+      <div class="composer-preview__header-col composer-preview__header-col--receive">
+        <span class="composer-preview__header-label">You Receive</span>
+        <button
+          v-if="props.selectedTokens.length > 0"
+          type="button"
+          class="composer-preview__receive-clear-btn"
+          title="Clear all selected tokens"
+          aria-label="Clear all selected tokens"
+          @click="props.clearSelection()"
+        >
+          Clear
+        </button>
+      </div>
     </div>
 
     <div v-if="props.selectedTokens.length === 0" class="composer-preview__empty">
@@ -611,6 +624,31 @@ function onApplyDefaultPercentToAllSelected() {
   color: var(--accent-primary);
 }
 
+.composer-preview__header-col--receive {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.composer-preview__receive-clear-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.composer-preview__receive-clear-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--error, #ef4444);
+  color: var(--error, #ef4444);
+}
+
 .composer-preview__header-col--arrow {
   display: flex;
   align-items: center;
@@ -1005,6 +1043,12 @@ function onApplyDefaultPercentToAllSelected() {
     min-height: 36px;
     min-width: 36px;
     padding: 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .composer-preview__receive-clear-btn {
+    min-height: 36px;
+    padding: 8px 12px;
     -webkit-tap-highlight-color: transparent;
   }
 

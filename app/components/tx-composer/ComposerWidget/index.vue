@@ -374,6 +374,7 @@ const outputTokenLogoUrl = computed(() => {
         :amount-drafts="amountDrafts"
         :token-key="tokenKey"
         :toggle-token="toggleToken"
+        :clear-selection="clearSelection"
         :commit-amount-draft="commitAmountDraft"
         :set-max-amount="setMaxAmount"
         :default-selection-percent="defaultSelectionPercent"
