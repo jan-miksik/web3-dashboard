@@ -2,15 +2,14 @@
 import { computed } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { useAppKit } from '@reown/appkit/vue'
+import { shortenAddress } from '~/utils/format'
 
 const { isConnected, address } = useConnection()
 const appKit = useAppKit()
 
-const buttonText = computed(() => {
-  // Show "Wallet Menu" if address is set (connected or has address)
-  if (address.value || isConnected.value) return 'Wallet Menu'
-  return 'Connect Wallet'
-})
+const isWalletConnected = computed(() => address.value || isConnected.value)
+
+const shortAddress = computed(() => (address.value ? shortenAddress(address.value) : ''))
 
 function handleConnectClick() {
   appKit.open()
@@ -20,18 +19,25 @@ function handleConnectClick() {
 <template>
   <div class="connect-button-wrapper" data-testid="connect-button-wrapper">
     <button
-      :class="['connect-button', { connected: isConnected || address }]"
+      :class="['connect-button', { connected: isWalletConnected }]"
       data-testid="connect-button"
       @click="handleConnectClick"
     >
-      <span data-testid="connect-button-text">{{ buttonText }}</span>
+      <template v-if="isWalletConnected">
+        <span class="connect-button__address" data-testid="connect-button-address">{{
+          shortAddress
+        }}</span>
+      </template>
+      <template v-else>
+        <span data-testid="connect-button-text">Connect Wallet</span>
+      </template>
     </button>
   </div>
 </template>
 
 <style scoped>
 .connect-button-wrapper {
-  width: 100%;
+  width: auto;
 }
 
 .connect-button {
@@ -39,9 +45,8 @@ function handleConnectClick() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
-  padding: 12px 24px;
-  min-height: 44px;
+  padding: 10px 16px;
+  min-height: 40px;
   background: var(--accent-primary);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -53,9 +58,20 @@ function handleConnectClick() {
   -webkit-tap-highlight-color: transparent;
 }
 
+.connect-button.connected {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
 .connect-button:hover {
-  background: var(--accent-primary);
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.connect-button.connected:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  box-shadow: none;
 }
 
 .connect-button:active {
@@ -68,22 +84,10 @@ function handleConnectClick() {
   transform: none;
 }
 
-.connect-button.loading {
-  opacity: 0.8;
-}
-
-.connect-icon {
-  font-size: 16px;
-}
-
-.spinner {
-  display: inline-block;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.connect-button__address {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 </style>

@@ -1,7 +1,36 @@
 <script setup lang="ts">
+import { computed, onUnmounted, ref } from 'vue'
+import type { Route } from '@lifi/sdk'
 import type { ComposerToken } from '~/composables/useTxComposer'
 import type { QuoteState } from './types'
-import { formatUsdValueParts } from '~/utils/format'
+import { clearBatchCapabilitiesCache } from '~/composables/useBatchTransaction'
+import { formatUsdValueParts, type UsdDisplay } from '~/utils/format'
+
+/** Type guard: return route when quote is ok, null otherwise. */
+function getQuoteRoute(quote: QuoteState | undefined): Route | null {
+  return quote?.status === 'ok' ? quote.route : null
+}
+
+/** Return error message when quote has error status. */
+function getQuoteErrorMessage(quote: QuoteState | undefined): string | null {
+  return quote?.status === 'error' ? quote.message : null
+}
+
+const isBatchCacheCleared = ref(false)
+let batchCacheClearTimeout: ReturnType<typeof setTimeout> | null = null
+
+function onClearBatchingCache() {
+  clearBatchCapabilitiesCache()
+  isBatchCacheCleared.value = true
+  if (batchCacheClearTimeout) clearTimeout(batchCacheClearTimeout)
+  batchCacheClearTimeout = setTimeout(() => {
+    isBatchCacheCleared.value = false
+  }, 2000)
+}
+
+onUnmounted(() => {
+  if (batchCacheClearTimeout) clearTimeout(batchCacheClearTimeout)
+})
 
 const props = defineProps<{
   selectedTokens: ComposerToken[]
@@ -39,7 +68,25 @@ const emit = defineEmits<{
   (e: 'update:amount-draft', v: { key: string; value: string }): void
 }>()
 
-const formatUsdValue = (value: number) => formatUsdValueParts(value)
+/** Format parts once per token for effective USD value. */
+const effectiveUsdPartsByKey = computed<Record<string, UsdDisplay>>(() => {
+  const o: Record<string, UsdDisplay> = {}
+  props.selectedTokens.forEach(t => {
+    o[props.tokenKey(t)] = formatUsdValueParts(props.getEffectiveUsdValue(t))
+  })
+  return o
+})
+
+/** Format parts once per token for quote output USD (when quote is ok). */
+const quoteUsdPartsByKey = computed<Record<string, UsdDisplay>>(() => {
+  const o: Record<string, UsdDisplay> = {}
+  props.selectedTokens.forEach(t => {
+    const route = getQuoteRoute(props.quotes[props.tokenKey(t)])
+    const usd = Number(route?.toAmountUSD ?? 0)
+    o[props.tokenKey(t)] = formatUsdValueParts(usd)
+  })
+  return o
+})
 
 function onSendDefaultInput(e: Event) {
   const input = e.target as HTMLInputElement
@@ -158,6 +205,19 @@ function onApplyDefaultPercentToAllSelected() {
       <div class="composer-preview__header-col">You Receive</div>
     </div>
 
+    <div class="composer-preview__cache-row">
+      <span class="composer-preview__cache-label">Batching cache</span>
+      <button
+        type="button"
+        class="composer-preview__cache-clear-btn"
+        :class="{ 'composer-preview__cache-clear-btn--cleared': isBatchCacheCleared }"
+        :title="isBatchCacheCleared ? 'Cleared' : 'Clear cached wallet batching capabilities'"
+        @click="onClearBatchingCache"
+      >
+        {{ isBatchCacheCleared ? 'Cleared' : 'Clear' }}
+      </button>
+    </div>
+
     <div v-if="props.selectedTokens.length === 0" class="composer-preview__empty">
       <div class="composer-preview__empty-icon">📋</div>
       <div class="composer-preview__empty-text">Select assets to preview routes</div>
@@ -244,12 +304,12 @@ function onApplyDefaultPercentToAllSelected() {
                   </div>
                   <div class="composer-preview__token-meta-right">
                     <div class="composer-preview__usd-value">
-                      <span>{{ formatUsdValue(props.getEffectiveUsdValue(t)).main }}</span>
+                      <span>{{ effectiveUsdPartsByKey[props.tokenKey(t)]?.main ?? '$0.00' }}</span>
                       <span
-                        v-if="formatUsdValue(props.getEffectiveUsdValue(t)).extra"
+                        v-if="effectiveUsdPartsByKey[props.tokenKey(t)]?.extra"
                         class="composer-preview__usd-sub-decimals"
                       >
-                        {{ formatUsdValue(props.getEffectiveUsdValue(t)).extra }}
+                        {{ effectiveUsdPartsByKey[props.tokenKey(t)]?.extra }}
                       </span>
                     </div>
                   </div>
@@ -279,7 +339,7 @@ function onApplyDefaultPercentToAllSelected() {
             </template>
             <template v-else-if="props.quotes[props.tokenKey(t)]?.status === 'error'">
               <div class="composer-preview__error">
-                {{ (props.quotes[props.tokenKey(t)] as any).message }}
+                {{ getQuoteErrorMessage(props.quotes[props.tokenKey(t)]) }}
               </div>
             </template>
             <template v-else-if="props.quotes[props.tokenKey(t)]?.status === 'ok'">
@@ -331,28 +391,12 @@ function onApplyDefaultPercentToAllSelected() {
                     </div>
                     <div class="composer-preview__token-meta-right">
                       <div class="composer-preview__usd-value">
-                        <span>{{
-                          formatUsdValue(
-                            Number((props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0)
-                          ).main
-                        }}</span>
+                        <span>{{ quoteUsdPartsByKey[props.tokenKey(t)]?.main ?? '$0.00' }}</span>
                         <span
-                          v-if="
-                            formatUsdValue(
-                              Number(
-                                (props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0
-                              )
-                            ).extra
-                          "
+                          v-if="quoteUsdPartsByKey[props.tokenKey(t)]?.extra"
                           class="composer-preview__usd-sub-decimals"
                         >
-                          {{
-                            formatUsdValue(
-                              Number(
-                                (props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0
-                              )
-                            ).extra
-                          }}
+                          {{ quoteUsdPartsByKey[props.tokenKey(t)]?.extra }}
                         </span>
                       </div>
                     </div>
@@ -592,6 +636,43 @@ function onApplyDefaultPercentToAllSelected() {
   background: var(--bg-hover);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+}
+
+.composer-preview__cache-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.composer-preview__cache-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.composer-preview__cache-clear-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.composer-preview__cache-clear-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.composer-preview__cache-clear-btn--cleared {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .composer-preview__header-col--arrow {

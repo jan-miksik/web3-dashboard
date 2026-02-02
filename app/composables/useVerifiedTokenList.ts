@@ -17,9 +17,10 @@ export interface UseVerifiedTokenListOptions {
   chainId?: MaybeRefOrGetter<number | null | undefined>
 }
 
-async function fetchVerifiedTokenList(): Promise<VerifiedTokenListItem[]> {
+async function fetchVerifiedTokenList(chainId?: number | null): Promise<VerifiedTokenListItem[]> {
   const response = await $fetch<{ tokens: Array<Record<string, unknown>> }>('/api/token-list', {
     method: 'GET',
+    query: chainId != null ? { chainId } : undefined,
   })
   if (!response?.tokens || !Array.isArray(response.tokens)) {
     return []
@@ -49,21 +50,23 @@ async function fetchVerifiedTokenList(): Promise<VerifiedTokenListItem[]> {
 export function useVerifiedTokenList(options: UseVerifiedTokenListOptions = {}) {
   const chainIdGetter = options.chainId
 
+  const chainId = computed(() => (chainIdGetter != null ? (toValue(chainIdGetter) ?? null) : null))
+
   const {
     data: allTokens,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['verifiedTokenList'],
-    queryFn: fetchVerifiedTokenList,
+    queryKey: computed(() => ['verifiedTokenList', chainId.value ?? 'all']),
+    queryFn: () => fetchVerifiedTokenList(chainId.value),
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 60 * 60 * 1000 * 2, // 2 hours
   })
 
   const tokens = computed(() => {
     const list = allTokens.value ?? []
-    const chain = chainIdGetter != null ? toValue(chainIdGetter) : undefined
+    const chain = chainId.value
     if (chain != null) {
       return list.filter(t => t.chainId === chain)
     }

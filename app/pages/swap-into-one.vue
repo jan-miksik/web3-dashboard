@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useTxComposer } from '~/composables/useTxComposer'
-import { CHAIN_METADATA } from '~/utils/chains'
-import type { ChainMetadata } from '~/utils/chains'
+import {
+  CHAIN_METADATA,
+  getChainName,
+  sortChainsByValue,
+  aggregateUsdByChainId,
+} from '~/utils/chains'
 
 useHead({ title: 'Swap into One | Web3 Dashboard' })
 
@@ -49,17 +53,6 @@ const hasInvalidRange = computed(() => {
   return minUsdValue.value > maxUsdValue.value
 })
 
-const sortChainsByValue = (
-  chains: ChainMetadata[],
-  balances: Record<number, number>
-): ChainMetadata[] => {
-  return [...chains].sort((a, b) => {
-    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
-    if (diff !== 0) return diff
-    return a.name.localeCompare(b.name)
-  })
-}
-
 // Chain filter logic
 const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 0) {
@@ -68,20 +61,14 @@ const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 1) {
     const chainId = Array.from(selectedChainIds.value)[0]
     if (chainId !== undefined) {
-      return CHAIN_METADATA.find(c => c.id === chainId)?.name || 'Unknown'
+      return getChainName(chainId)
     }
     return 'Unknown'
   }
   return `${selectedChainIds.value.size} Chains`
 })
 
-const chainBalances = computed(() => {
-  const balances: Record<number, number> = {}
-  allTokens.value.forEach(t => {
-    balances[t.chainId] = (balances[t.chainId] || 0) + t.usdValue
-  })
-  return balances
-})
+const chainBalances = computed(() => aggregateUsdByChainId(allTokens.value))
 
 const chainsWithAssets = computed(() => {
   const chainIdsInTokens = new Set(allTokens.value.map(t => t.chainId))

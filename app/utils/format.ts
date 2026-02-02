@@ -3,6 +3,18 @@ export type UsdDisplay = {
   extra: string | null
 }
 
+/**
+ * Shorten an address for display (e.g. 0x1234...5678).
+ * @param addr - Full address string
+ * @param start - Number of leading characters (default 6)
+ * @param end - Number of trailing characters (default 4)
+ */
+export function shortenAddress(addr: string, start = 6, end = 4): string {
+  if (!addr || typeof addr !== 'string') return ''
+  if (addr.length <= start + end) return addr
+  return `${addr.slice(0, start)}...${addr.slice(-end)}`
+}
+
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',

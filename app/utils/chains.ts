@@ -126,6 +126,35 @@ export function getChainStyle(chainId: number): { color: string; bgColor: string
   return { color: 'var(--text-secondary)', bgColor: 'var(--bg-tertiary)' }
 }
 
+/**
+ * Aggregate USD value per chain from a list of tokens.
+ * Shared by useComposerTargetState, useTokenList, and swap-into-one.
+ */
+export function aggregateUsdByChainId(
+  tokens: Array<{ chainId: number; usdValue: number }>
+): Record<number, number> {
+  const balances: Record<number, number> = {}
+  tokens.forEach(t => {
+    balances[t.chainId] = (balances[t.chainId] ?? 0) + t.usdValue
+  })
+  return balances
+}
+
+/**
+ * Sort chains by aggregate USD balance (desc), then by name.
+ * Shared by useComposerTargetState, useTokenList, and swap-into-one.
+ */
+export function sortChainsByValue(
+  chains: ChainMetadata[],
+  balances: Record<number, number>
+): ChainMetadata[] {
+  return [...chains].sort((a, b) => {
+    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
+    if (diff !== 0) return diff
+    return a.name.localeCompare(b.name)
+  })
+}
+
 export const ZERION_TO_CHAIN_ID: Record<string, number> = {
   ethereum: 1,
   polygon: 137,

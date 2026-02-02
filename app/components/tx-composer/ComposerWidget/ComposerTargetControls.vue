@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
 import type { TargetAssetMode, ResolvedToken } from './types'
+import { useClickOutside } from '~/composables/useClickOutside'
 
 const props = defineProps<{
   // Chain selection
@@ -65,23 +66,18 @@ function onSelectTokenFromModal(token: ResolvedToken) {
   props.selectCustomToken(token)
   showTokenSelectModal.value = false
 }
+
+function onSelectChainFromModal(chainId: number | null) {
+  if (chainId === null) {
+    props.onClearTargetChain()
+    return
+  }
+  props.onToggleTargetChain(chainId)
+}
 const targetAssetDropdownRef = ref<HTMLElement | null>(null)
 
-const handleClickOutsideDropdown = (event: MouseEvent) => {
-  if (
-    targetAssetDropdownRef.value &&
-    !targetAssetDropdownRef.value.contains(event.target as Node)
-  ) {
-    showTargetAssetDropdown.value = false
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('click', handleClickOutsideDropdown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutsideDropdown)
+useClickOutside(targetAssetDropdownRef, () => {
+  showTargetAssetDropdown.value = false
 })
 </script>
 
@@ -319,6 +315,7 @@ onUnmounted(() => {
       :chain-id="props.targetChainId"
       :current-token-address="props.targetTokenAddress"
       @select="onSelectTokenFromModal"
+      @select-chain="onSelectChainFromModal"
       @close="showTokenSelectModal = false"
     />
   </div>

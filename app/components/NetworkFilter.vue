@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
 import { formatUsdValueParts } from '~/utils/format'
+import { useClickOutside } from '~/composables/useClickOutside'
 
 interface Props {
   chainsWithAssets: ChainMetadata[]
@@ -24,23 +25,8 @@ const emit = defineEmits<{
   'update:showChainFilter': [value: boolean]
 }>()
 
-function handleClickOutside(event: MouseEvent) {
-  const target = event.target as HTMLElement
-  if (chainFilterRef.value && !chainFilterRef.value.contains(target)) {
-    emit('update:showChainFilter', false)
-  }
-}
-
-onMounted(() => {
-  if (typeof window !== 'undefined') {
-    window.addEventListener('click', handleClickOutside)
-  }
-})
-
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('click', handleClickOutside)
-  }
+useClickOutside(chainFilterRef, () => {
+  emit('update:showChainFilter', false)
 })
 
 const formatBalance = (val: number | undefined) => {

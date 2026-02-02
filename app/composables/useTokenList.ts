@@ -1,25 +1,20 @@
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { useTokens } from '~/composables/useTokens'
 import { useWatchedAddress } from '~/composables/useWatchedAddress'
-import { CHAIN_METADATA, getChainMetadata, getChainIcon } from '~/utils/chains'
+import {
+  CHAIN_METADATA,
+  getChainMetadata,
+  getChainIcon,
+  sortChainsByValue,
+  aggregateUsdByChainId,
+} from '~/utils/chains'
 import type { ChainMetadata } from '~/utils/chains'
-import { handleError } from '~/utils/error-handler'
-import { formatUsdValueParts, formatUsdValueString } from '~/utils/format'
+import { shortenAddress, formatUsdValueParts, formatUsdValueString } from '~/utils/format'
+import { useCopyToClipboard } from '~/composables/useCopyToClipboard'
 
 const getAvailableChains = (chainIds: Set<number>): ChainMetadata[] => {
   return CHAIN_METADATA.filter(chain => chainIds.has(chain.id))
-}
-
-const sortChainsByValue = (
-  chains: ChainMetadata[],
-  balances: Record<number, number>
-): ChainMetadata[] => {
-  return [...chains].sort((a, b) => {
-    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
-    if (diff !== 0) return diff
-    return a.name.localeCompare(b.name)
-  })
 }
 
 export function useTokenList() {
@@ -35,35 +30,9 @@ export function useTokenList() {
   const selectedChainIds = ref<Set<number>>(new Set()) // Empty set = all chains
   const showChainFilter = ref(false)
   const isRefreshing = ref(false)
-  const copiedAddress = ref<string | null>(null)
-  let copyTimeout: ReturnType<typeof setTimeout> | null = null
-
-  // Utility functions
-  function shortenAddress(address: string): string {
-    if (!address) return ''
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  async function copyTokenAddress(address: string) {
-    try {
-      await navigator.clipboard.writeText(address)
-      copiedAddress.value = address
-
-      if (copyTimeout) {
-        clearTimeout(copyTimeout)
-      }
-
-      copyTimeout = setTimeout(() => {
-        copiedAddress.value = null
-      }, 2000)
-    } catch (error) {
-      handleError(error, {
-        message: 'Failed to copy address to clipboard',
-        context: { address },
-        showNotification: true,
-      })
-    }
-  }
+  const { copy: copyTokenAddress, copiedValue: copiedAddress } = useCopyToClipboard({
+    clearAfterMs: 2000,
+  })
 
   async function handleRefresh() {
     isRefreshing.value = true
@@ -76,13 +45,7 @@ export function useTokenList() {
   }
 
   // Computed properties for chains
-  const chainBalances = computed<Record<number, number>>(() => {
-    const balances: Record<number, number> = {}
-    tokens.value.forEach(token => {
-      balances[token.chainId] = (balances[token.chainId] || 0) + token.usdValue
-    })
-    return balances
-  })
+  const chainBalances = computed<Record<number, number>>(() => aggregateUsdByChainId(tokens.value))
 
   const chainsWithAssets = computed(() => {
     const chainIds = new Set(tokens.value.map(t => t.chainId))
@@ -197,12 +160,6 @@ export function useTokenList() {
     selectedChainIds.value = new Set()
     showChainFilter.value = false
   }
-
-  onUnmounted(() => {
-    if (copyTimeout) {
-      clearTimeout(copyTimeout)
-    }
-  })
 
   // Formatting functions
   function formatBalance(balance: string): string {

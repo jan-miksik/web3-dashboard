@@ -10,6 +10,7 @@ import {
 } from '@lifi/sdk'
 import { useConnectorClient, useSwitchChain, useConfig } from '@wagmi/vue'
 import { getWalletClient } from '@wagmi/core'
+import { getTokenKey } from '~/utils/tokenKey'
 import { logger } from '~/utils/logger'
 
 // Initialize LiFi SDK (module singleton)
@@ -109,12 +110,12 @@ export function useTxComposer() {
       })
       .map(t => ({
         ...t,
-        selected: selectedTokenIds.value.has(`${t.chainId}-${t.address}`),
+        selected: selectedTokenIds.value.has(getTokenKey(t)),
       }))
   })
 
   const selectedTokens = computed<ComposerToken[]>(() => {
-    return filteredTokens.value.filter(t => selectedTokenIds.value.has(`${t.chainId}-${t.address}`))
+    return filteredTokens.value.filter(t => selectedTokenIds.value.has(getTokenKey(t)))
   })
 
   const applyDefaultPercentToToken = (token: Token) => {
@@ -131,14 +132,14 @@ export function useTxComposer() {
 
   const applyDefaultPercentToAllSelected = () => {
     for (const token of filteredTokens.value) {
-      if (selectedTokenIds.value.has(`${token.chainId}-${token.address}`)) {
+      if (selectedTokenIds.value.has(getTokenKey(token))) {
         applyDefaultPercentToToken(token)
       }
     }
   }
 
   const toggleToken = (token: Token) => {
-    const id = `${token.chainId}-${token.address}`
+    const id = getTokenKey(token)
     const newSet = new Set(selectedTokenIds.value)
     if (newSet.has(id)) {
       newSet.delete(id)
@@ -155,7 +156,7 @@ export function useTxComposer() {
     const prev = selectedTokenIds.value
     const newSet = new Set(selectedTokenIds.value)
     tokens.forEach(t => {
-      const id = `${t.chainId}-${t.address}`
+      const id = getTokenKey(t)
       const isNew = !prev.has(id)
       newSet.add(id)
       if (isNew) applyDefaultPercentToToken(t)
@@ -165,7 +166,7 @@ export function useTxComposer() {
 
   const deselectTokens = (tokens: Token[]) => {
     const newSet = new Set(selectedTokenIds.value)
-    tokens.forEach(t => newSet.delete(`${t.chainId}-${t.address}`))
+    tokens.forEach(t => newSet.delete(getTokenKey(t)))
     selectedTokenIds.value = newSet
   }
 
@@ -173,9 +174,6 @@ export function useTxComposer() {
     selectedTokenIds.value = new Set()
     customAmounts.value = new Map()
   }
-
-  const getTokenKey = (token: { chainId: number; address: string }) =>
-    `${token.chainId}-${token.address}`
 
   const getCustomAmount = (token: Token): string | null => {
     return customAmounts.value.get(getTokenKey(token)) ?? null
@@ -303,6 +301,7 @@ export function useTxComposer() {
   }
 
   return {
+    getTokenKey,
     // Data
     allTokens,
     filteredTokens,

@@ -354,6 +354,10 @@ export function hasUSDC(chainId: number): boolean {
   return chainId in USDC_ADDRESSES
 }
 
+/** ETH token icon URL (used when native gas token is ETH) */
+export const ETH_ICON_URL =
+  'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png'
+
 /**
  * Gas token names per chain
  * These are the native tokens used for gas on each chain

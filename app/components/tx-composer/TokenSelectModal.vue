@@ -3,7 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { getPublicClient } from '@wagmi/core'
 import { useConfig, type Config } from '@wagmi/vue'
 import { isAddress, parseAbi, type Address } from 'viem'
-import { getChainName } from '~/utils/chains'
+import { CHAIN_METADATA, getChainName } from '~/utils/chains'
 import { getCommonTokens } from '~/utils/tokenAddresses'
 import { useVerifiedTokenList } from '~/composables/useVerifiedTokenList'
 import type { ResolvedToken } from '~/components/tx-composer/ComposerWidget/types'
@@ -20,14 +20,16 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'select', token: ResolvedToken): void
+  (e: 'select-chain', chainId: number | null): void
   (e: 'close'): void
 }>()
 
 const config = useConfig() as unknown as Config
 
 const modalRef = ref<HTMLElement | null>(null)
+const listRef = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
-const customAddressInput = ref('')
+const showChainFilter = ref(false)
 const resolvedToken = ref<ResolvedToken | null>(null)
 const isResolving = ref(false)
 const resolveError = ref<string | null>(null)
@@ -38,7 +40,24 @@ const ERC20_META_ABI = parseAbi([
   'function decimals() view returns (uint8)',
 ])
 
-const chainName = computed(() => (props.chainId !== null ? getChainName(props.chainId) : 'Unknown'))
+const chainName = computed(() =>
+  props.chainId !== null ? getChainName(props.chainId) : 'Select chain'
+)
+const selectedChainIds = computed(() =>
+  props.chainId !== null ? new Set([props.chainId]) : new Set<number>()
+)
+function isChainSelected(chainId: number) {
+  return props.chainId === chainId
+}
+function onToggleChain(chainId: number) {
+  emit('select-chain', chainId)
+}
+function onClearChain() {
+  emit('select-chain', null)
+}
+function setShowChainFilter(value: boolean) {
+  showChainFilter.value = value
+}
 
 const commonTokens = computed(() => {
   if (props.chainId === null) return []
@@ -49,12 +68,17 @@ const { tokens: verifiedTokens, isLoading: isVerifiedListLoading } = useVerified
   chainId: computed(() => props.chainId),
 })
 
-/** Common tokens first, then verified list tokens not already in common (by address). All have logoURI when available. */
+/** Common tokens first, then verified list tokens (not in common) sorted by symbol so known/popular order is stable. */
 const listTokens = computed((): Array<ResolvedToken & { logoURI?: string }> => {
   const common = commonTokens.value
   const verified = verifiedTokens.value
   const commonAddrs = new Set(common.map(t => t.address.toLowerCase()))
-  const extra = verified.filter(t => !commonAddrs.has(t.address.toLowerCase()))
+  const extra = verified
+    .filter(t => !commonAddrs.has(t.address.toLowerCase()))
+    .slice()
+    .sort((a, b) =>
+      (a.symbol ?? '').localeCompare(b.symbol ?? '', undefined, { sensitivity: 'base' })
+    )
   return [...common, ...extra]
 })
 
@@ -62,7 +86,19 @@ const filteredTokens = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   const list = listTokens.value
   if (!q) return list
-  return list.filter(t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q))
+  const qNo0x = q.startsWith('0x') ? q.slice(2) : q
+  return list.filter(t => {
+    const symbol = t.symbol?.toLowerCase?.() ?? ''
+    const name = t.name?.toLowerCase?.() ?? ''
+    const addr = t.address?.toLowerCase?.() ?? ''
+    const addrNo0x = addr.startsWith('0x') ? addr.slice(2) : addr
+    return (
+      symbol.includes(q) ||
+      name.includes(q) ||
+      addr.includes(q) ||
+      (qNo0x.length >= 4 && addrNo0x.includes(qNo0x))
+    )
+  })
 })
 
 async function resolveCustomToken() {
@@ -74,7 +110,7 @@ async function resolveCustomToken() {
     return
   }
 
-  const addr = customAddressInput.value.trim()
+  const addr = searchQuery.value.trim()
   if (!isAddress(addr)) {
     resolveError.value = 'Enter a valid token address'
     return
@@ -95,11 +131,16 @@ async function resolveCustomToken() {
       }),
     ])
 
+    const fromList = listTokens.value.find(
+      t => t.address.toLowerCase() === (addr as Address).toLowerCase()
+    )
+
     resolvedToken.value = {
       address: addr as Address,
       symbol: String(symbol),
       name: String(name),
       decimals: Number(decimals),
+      logoURI: fromList?.logoURI,
     }
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Failed to resolve token'
@@ -116,10 +157,22 @@ function selectToken(token: ResolvedToken) {
 
 function handleClose() {
   searchQuery.value = ''
-  customAddressInput.value = ''
   resolvedToken.value = null
   resolveError.value = null
   emit('close')
+}
+
+/** Shown when user typed a valid address that is not in the verified list — validate, warn, offer "Use this address". */
+const showUnknownAddressUi = computed(() => {
+  if (props.chainId === null) return false
+  const q = searchQuery.value.trim()
+  if (!q || !isAddress(q)) return false
+  const inList = listTokens.value.some(t => t.address.toLowerCase() === q.toLowerCase())
+  return !inList
+})
+
+function onTokenImageError(e: Event) {
+  ;(e.target as HTMLImageElement).style.display = 'none'
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -135,13 +188,28 @@ watch(
   async open => {
     if (!open) {
       searchQuery.value = ''
-      customAddressInput.value = ''
       resolvedToken.value = null
       resolveError.value = null
     } else {
       await nextTick()
       modalRef.value?.focus()
     }
+  }
+)
+
+watch(searchQuery, () => {
+  resolvedToken.value = null
+  resolveError.value = null
+})
+
+watch(
+  () => props.chainId,
+  async () => {
+    searchQuery.value = ''
+    resolvedToken.value = null
+    resolveError.value = null
+    await nextTick()
+    listRef.value?.scrollTo?.({ top: 0 })
   }
 )
 </script>
@@ -163,9 +231,20 @@ watch(
         <div class="token-select-modal__content">
           <div class="token-select-modal__header">
             <h2 id="token-select-modal-title" class="token-select-modal__title">Select token</h2>
-            <p v-if="chainId !== null" class="token-select-modal__chain">
-              {{ chainName }}
-            </p>
+            <div class="token-select-modal__chain">
+              <NetworkFilter
+                :chains-with-assets="CHAIN_METADATA"
+                :chains-without-assets="[]"
+                :selected-chain-ids="selectedChainIds"
+                :selected-chains-display="chainName"
+                :show-chain-filter="showChainFilter"
+                :is-chain-selected="isChainSelected"
+                :on-toggle-chain="onToggleChain"
+                :on-click-all-networks="onClearChain"
+                all-networks-label="Select chain"
+                @update:show-chain-filter="setShowChainFilter($event)"
+              />
+            </div>
             <button
               type="button"
               class="token-select-modal__close"
@@ -181,9 +260,9 @@ watch(
               v-model="searchQuery"
               type="text"
               class="token-select-modal__search-input"
-              placeholder="Search"
+              placeholder="Search by symbol, name, or address"
               autocomplete="off"
-              aria-label="Search tokens by symbol or name"
+              aria-label="Search tokens by symbol, name, or address"
             />
           </div>
 
@@ -192,7 +271,12 @@ watch(
           </div>
 
           <template v-else>
-            <div class="token-select-modal__list" role="listbox" aria-label="Token list">
+            <div
+              ref="listRef"
+              class="token-select-modal__list"
+              role="listbox"
+              aria-label="Token list"
+            >
               <p
                 v-if="isVerifiedListLoading && listTokens.length === 0"
                 class="token-select-modal__loading"
@@ -217,6 +301,7 @@ watch(
                     :src="token.logoURI"
                     :alt="token.symbol"
                     class="token-select-modal__icon"
+                    @error="onTokenImageError"
                   />
                   <div v-else class="token-select-modal__icon-placeholder">
                     {{ token.symbol.slice(0, 1) }}
@@ -237,27 +322,18 @@ watch(
               </template>
             </div>
 
-            <div class="token-select-modal__custom">
-              <label class="token-select-modal__custom-label"> Or paste token address </label>
-              <div class="token-select-modal__custom-row">
-                <input
-                  v-model="customAddressInput"
-                  type="text"
-                  class="token-select-modal__custom-input"
-                  placeholder="0x…"
-                  spellcheck="false"
-                  autocomplete="off"
-                  @keydown.enter="resolveCustomToken"
-                />
-                <button
-                  type="button"
-                  class="token-select-modal__custom-btn"
-                  :disabled="isResolving || !customAddressInput.trim()"
-                  @click="resolveCustomToken"
-                >
-                  {{ isResolving ? 'Resolving…' : 'Add' }}
-                </button>
-              </div>
+            <div v-if="showUnknownAddressUi" class="token-select-modal__unknown-address">
+              <p class="token-select-modal__unknown-warning">
+                This address is not in the verified list. Use at your own risk.
+              </p>
+              <button
+                type="button"
+                class="token-select-modal__use-address-btn"
+                :disabled="isResolving"
+                @click="resolveCustomToken"
+              >
+                {{ isResolving ? 'Resolving…' : 'Use this address' }}
+              </button>
               <p v-if="resolveError" class="token-select-modal__error">
                 {{ resolveError }}
               </p>
@@ -267,7 +343,14 @@ watch(
                   class="token-select-modal__item"
                   @click="selectToken(resolvedToken)"
                 >
-                  <div class="token-select-modal__icon-placeholder">
+                  <img
+                    v-if="resolvedToken.logoURI"
+                    :src="resolvedToken.logoURI"
+                    :alt="resolvedToken.symbol"
+                    class="token-select-modal__icon"
+                    @error="onTokenImageError"
+                  />
+                  <div v-else class="token-select-modal__icon-placeholder">
                     {{ resolvedToken.symbol.slice(0, 1) }}
                   </div>
                   <div class="token-select-modal__item-info">
@@ -333,10 +416,11 @@ watch(
 }
 
 .token-select-modal__chain {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex: 1;
+  min-width: 0;
 }
 
 .token-select-modal__close {
@@ -479,40 +563,18 @@ watch(
   text-align: center;
 }
 
-.token-select-modal__custom {
+.token-select-modal__unknown-address {
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
 }
 
-.token-select-modal__custom-label {
-  display: block;
+.token-select-modal__unknown-warning {
   font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin: 0 0 10px;
 }
 
-.token-select-modal__custom-row {
-  display: flex;
-  gap: 8px;
-}
-
-.token-select-modal__custom-input {
-  flex: 1;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  outline: none;
-}
-
-.token-select-modal__custom-input:focus {
-  border-color: var(--accent-primary);
-}
-
-.token-select-modal__custom-btn {
+.token-select-modal__use-address-btn {
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
@@ -526,12 +588,12 @@ watch(
     border-color 0.2s;
 }
 
-.token-select-modal__custom-btn:hover:not(:disabled) {
+.token-select-modal__use-address-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--border-light);
 }
 
-.token-select-modal__custom-btn:disabled {
+.token-select-modal__use-address-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
