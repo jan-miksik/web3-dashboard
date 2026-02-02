@@ -99,7 +99,7 @@ const effectiveAddress = computed<string | null>(() => {
   return watchedAddress.value
 })
 
-const { latestSuccess, allTransactions } = useTransactionHistory(effectiveAddress.value)
+const { latestSuccess, allTransactions } = useTransactionHistory(effectiveAddress)
 
 const showRecap = computed(() => {
   return !!latestSuccess.value || allTransactions.value.length > 0

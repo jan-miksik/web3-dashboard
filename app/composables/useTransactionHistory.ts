@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch, type MaybeRef } from 'vue'
 import { logger } from '~/utils/logger'
 
 export type AppTxStatus = 'submitted' | 'pending' | 'success' | 'failed'
@@ -21,19 +21,26 @@ const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !==
 
 const storageKeyFor = (address: string) => `web3-dashboard:tx-history:${address.toLowerCase()}`
 
+const memoryStore = new Map<string, AppTxRecord[]>()
+
+export const clearTransactionHistoryCache = () => {
+  memoryStore.clear()
+}
+
 const readStore = (key: string): AppTxRecord[] => {
-  if (!isBrowser()) return []
+  if (!isBrowser()) return memoryStore.get(key) ?? []
   try {
     const raw = localStorage.getItem(key)
-    if (!raw) return []
+    if (!raw) return memoryStore.get(key) ?? []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as AppTxRecord[]) : []
   } catch {
-    return []
+    return memoryStore.get(key) ?? []
   }
 }
 
 const writeStore = (key: string, records: AppTxRecord[]) => {
+  memoryStore.set(key, records)
   if (!isBrowser()) return
   try {
     localStorage.setItem(key, JSON.stringify(records))
@@ -48,13 +55,35 @@ export const isUserRejectedError = (error: unknown): boolean => {
   return code === 4001 || msg.includes('user rejected') || msg.includes('user denied')
 }
 
-export function useTransactionHistory(address?: string | null) {
-  const storageKey = address ? storageKeyFor(address) : null
-  const records = ref<AppTxRecord[]>(storageKey ? readStore(storageKey) : [])
+export function useTransactionHistory(address?: MaybeRef<string | null | undefined>) {
+  // Normalize address to ensure reactivity - if it's already a ref/computed, use it directly
+  // Otherwise wrap it in a ref
+  const addressSource =
+    address && typeof address === 'object' && 'value' in address ? address : ref(address)
+
+  const currentAddress = computed(() => {
+    const val = addressSource.value
+    return val ?? null
+  })
+  const storageKey = computed(() => {
+    const addr = currentAddress.value
+    return addr ? storageKeyFor(addr) : null
+  })
+  const records = ref<AppTxRecord[]>([])
+
+  // Watch for address changes and reload records from storage
+  watch(
+    currentAddress,
+    addr => {
+      records.value = addr ? readStore(storageKeyFor(addr)) : []
+    },
+    { immediate: true, flush: 'sync' }
+  )
 
   const persist = () => {
-    if (!storageKey) return
-    writeStore(storageKey, records.value)
+    const key = storageKey.value
+    if (!key) return
+    writeStore(key, records.value)
   }
 
   const addTransaction = (record: AppTxRecord) => {

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
+import { ref, computed } from 'vue'
 
-import { useTransactionHistory } from '~/composables/useTransactionHistory'
+import {
+  clearTransactionHistoryCache,
+  useTransactionHistory,
+} from '~/composables/useTransactionHistory'
 import { logger } from '~/utils/logger'
 
 // Mock logger - hoisted to ensure it's set up before module imports
@@ -16,6 +20,7 @@ vi.mock('~/utils/logger', () => ({
 describe('useTransactionHistory', () => {
   beforeEach(() => {
     localStorage.clear()
+    clearTransactionHistoryCache()
     vi.clearAllMocks()
   })
 
@@ -188,5 +193,80 @@ describe('useTransactionHistory', () => {
     expect(allTransactions.value[0]?.hash).toBe('0x1')
     expect(allTransactions.value[0]?.chainId).toBe(10)
     expect(allTransactions.value[0]?.status).toBe('success')
+  })
+
+  it('reacts to address changes via ref', () => {
+    const addressRef = ref('0xabc')
+    const { addTransaction, allTransactions } = useTransactionHistory(addressRef)
+
+    // Add transaction for address A
+    addTransaction({
+      hash: '0x1',
+      chainId: 1,
+      status: 'submitted',
+      timestamp: 1,
+      source: 'app',
+    })
+    expect(allTransactions.value).toHaveLength(1)
+
+    // Switch to address B
+    addressRef.value = '0xdef'
+    // History should be empty for address B
+    expect(allTransactions.value).toHaveLength(0)
+
+    // Add transaction for address B
+    addTransaction({
+      hash: '0x2',
+      chainId: 1,
+      status: 'submitted',
+      timestamp: 2,
+      source: 'app',
+    })
+    expect(allTransactions.value).toHaveLength(1)
+    expect(allTransactions.value[0]?.hash).toBe('0x2')
+
+    // Switch back to address A
+    addressRef.value = '0xabc'
+    // Should see address A's history
+    expect(allTransactions.value).toHaveLength(1)
+    expect(allTransactions.value[0]?.hash).toBe('0x1')
+  })
+
+  it('reacts to address changes via computed', () => {
+    const baseAddress = ref('0xabc')
+    const addressComputed = computed(() => baseAddress.value)
+    const { addTransaction, allTransactions } = useTransactionHistory(addressComputed)
+
+    // Add transaction for address A
+    addTransaction({
+      hash: '0x1',
+      chainId: 1,
+      status: 'submitted',
+      timestamp: 1,
+      source: 'app',
+    })
+    expect(allTransactions.value).toHaveLength(1)
+
+    // Switch to address B via computed
+    baseAddress.value = '0xdef'
+    // History should be empty for address B
+    expect(allTransactions.value).toHaveLength(0)
+
+    // Add transaction for address B
+    addTransaction({
+      hash: '0x2',
+      chainId: 1,
+      status: 'submitted',
+      timestamp: 2,
+      source: 'app',
+    })
+    expect(allTransactions.value).toHaveLength(1)
+    expect(allTransactions.value[0]?.hash).toBe('0x2')
+
+    // Switch back to address A
+    baseAddress.value = '0xabc'
+    // Should see address A's history
+    expect(allTransactions.value).toHaveLength(1)
+    expect(allTransactions.value[0]?.hash).toBe('0x1')
   })
 })
