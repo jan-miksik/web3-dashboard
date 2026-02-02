@@ -8,6 +8,7 @@ const props = defineProps<{
   totalValueOut: number
   formattedTotalOutput: string
   outputTokenSymbol: string
+  outputTokenLogoUrl?: string
   hasOutQuotes: boolean
 }>()
 
@@ -35,6 +36,12 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
         <label class="composer-summary__label">Total Receive</label>
         <div class="composer-summary__value">
           <span>{{ props.formattedTotalOutput }}</span>
+          <img
+            v-if="props.outputTokenLogoUrl"
+            :src="props.outputTokenLogoUrl"
+            :alt="props.outputTokenSymbol"
+            class="composer-summary__token-icon"
+          />
           <span
             v-if="props.outputTokenSymbol && props.outputTokenSymbol !== 'Select target'"
             class="composer-summary__muted-symbol"
@@ -85,6 +92,14 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
+}
+
+.composer-summary__token-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .composer-summary__muted-symbol {

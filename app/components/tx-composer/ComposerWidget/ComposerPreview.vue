@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import type { Route } from '@lifi/sdk'
 import type { ComposerToken } from '~/composables/useTxComposer'
 import type { QuoteState } from './types'
-import { clearBatchCapabilitiesCache } from '~/composables/useBatchTransaction'
 import { formatUsdValueParts, type UsdDisplay } from '~/utils/format'
 
 /** Type guard: return route when quote is ok, null otherwise. */
@@ -15,22 +14,6 @@ function getQuoteRoute(quote: QuoteState | undefined): Route | null {
 function getQuoteErrorMessage(quote: QuoteState | undefined): string | null {
   return quote?.status === 'error' ? quote.message : null
 }
-
-const isBatchCacheCleared = ref(false)
-let batchCacheClearTimeout: ReturnType<typeof setTimeout> | null = null
-
-function onClearBatchingCache() {
-  clearBatchCapabilitiesCache()
-  isBatchCacheCleared.value = true
-  if (batchCacheClearTimeout) clearTimeout(batchCacheClearTimeout)
-  batchCacheClearTimeout = setTimeout(() => {
-    isBatchCacheCleared.value = false
-  }, 2000)
-}
-
-onUnmounted(() => {
-  if (batchCacheClearTimeout) clearTimeout(batchCacheClearTimeout)
-})
 
 const props = defineProps<{
   selectedTokens: ComposerToken[]
@@ -122,7 +105,9 @@ function onApplyDefaultPercentToAllSelected() {
     <div class="composer-preview__header">
       <div class="composer-preview__title">Transaction Preview</div>
       <div class="composer-preview__header-right">
-        <div class="composer-preview__subtitle">{{ props.poweredByText }}</div>
+        <div v-if="props.showRouteDetails" class="composer-preview__subtitle">
+          {{ props.poweredByText }}
+        </div>
         <label class="composer-preview__details-toggle">
           <input
             :checked="props.showRouteDetails"
@@ -203,19 +188,6 @@ function onApplyDefaultPercentToAllSelected() {
         <span class="composer-preview__arrow" title="Swap to">→</span>
       </div>
       <div class="composer-preview__header-col">You Receive</div>
-    </div>
-
-    <div class="composer-preview__cache-row">
-      <span class="composer-preview__cache-label">Batching cache</span>
-      <button
-        type="button"
-        class="composer-preview__cache-clear-btn"
-        :class="{ 'composer-preview__cache-clear-btn--cleared': isBatchCacheCleared }"
-        :title="isBatchCacheCleared ? 'Cleared' : 'Clear cached wallet batching capabilities'"
-        @click="onClearBatchingCache"
-      >
-        {{ isBatchCacheCleared ? 'Cleared' : 'Clear' }}
-      </button>
     </div>
 
     <div v-if="props.selectedTokens.length === 0" class="composer-preview__empty">
@@ -599,6 +571,7 @@ function onApplyDefaultPercentToAllSelected() {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 700;
+  margin-left: -0.5rem;
 }
 
 .composer-preview__send-default-max-btn {
@@ -636,43 +609,6 @@ function onApplyDefaultPercentToAllSelected() {
   background: var(--bg-hover);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-}
-
-.composer-preview__cache-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  padding: 0 2px;
-}
-
-.composer-preview__cache-label {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.composer-preview__cache-clear-btn {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.composer-preview__cache-clear-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-light);
-  color: var(--text-primary);
-}
-
-.composer-preview__cache-clear-btn--cleared {
-  background: var(--success-muted);
-  border-color: var(--success);
-  color: var(--success);
 }
 
 .composer-preview__header-col--arrow {
@@ -721,8 +657,8 @@ function onApplyDefaultPercentToAllSelected() {
 
 .composer-preview__cancel-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 5px;
+  right: 5px;
   width: 20px;
   height: 20px;
   display: flex;

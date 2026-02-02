@@ -300,6 +300,11 @@ const getTargetChainName = () => {
   if (targetChainId.value === null) return ''
   return CHAIN_METADATA.find(c => c.id === targetChainId.value)?.name ?? ''
 }
+
+const outputTokenLogoUrl = computed(() => {
+  const first = selectedTokens.value[0]
+  return first ? getOutputLogo(first) : undefined
+})
 </script>
 
 <template>
@@ -310,6 +315,7 @@ const getTargetChainName = () => {
       :total-value-out="totalValueOut"
       :formatted-total-output="formattedTotalOutput"
       :output-token-symbol="outputTokenSymbol"
+      :output-token-logo-url="outputTokenLogoUrl"
       :has-out-quotes="hasOutQuotes"
     />
 

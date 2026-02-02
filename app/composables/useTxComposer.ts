@@ -36,8 +36,18 @@ const selectedTokenIds = ref<Set<string>>(new Set())
 // If not set, uses full balance
 const customAmounts = ref<Map<string, string>>(new Map())
 
-// Default percentage of balance to select when user clicks an asset (0–100)
-const defaultSelectionPercent = ref(100)
+const DEFAULT_SELECTION_PERCENT_KEY = 'web3-dashboard-default-selection-percent'
+
+function loadDefaultSelectionPercent(): number {
+  if (typeof window === 'undefined') return 100
+  const stored = localStorage.getItem(DEFAULT_SELECTION_PERCENT_KEY)
+  if (stored == null) return 100
+  const num = Number.parseFloat(stored)
+  return Number.isFinite(num) ? Math.min(100, Math.max(0, num)) : 100
+}
+
+// Default percentage of balance to select when user clicks an asset (0–100), persisted in localStorage
+const defaultSelectionPercent = ref(loadDefaultSelectionPercent())
 
 const isExecuting = ref(false)
 const executionStatus = ref<string>('')
@@ -72,6 +82,11 @@ function buildQuoteCacheKey(p: QuoteKeyParams): string {
     p.fromAddress.toLowerCase(),
     p.toAddress.toLowerCase(),
   ].join(':')
+}
+
+/** Clear in-memory quote cache (LI.FI routes). Call to force fresh quotes. */
+export function clearQuoteCache(): void {
+  quoteCache.clear()
 }
 
 export function useTxComposer() {
@@ -331,7 +346,11 @@ export function useTxComposer() {
     defaultSelectionPercent,
     setDefaultSelectionPercent: (pct: number) => {
       const clamped = Math.min(100, Math.max(0, pct))
-      defaultSelectionPercent.value = Number.isFinite(clamped) ? clamped : 100
+      const value = Number.isFinite(clamped) ? clamped : 100
+      defaultSelectionPercent.value = value
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DEFAULT_SELECTION_PERCENT_KEY, String(value))
+      }
     },
     applyDefaultPercentToAllSelected,
 
