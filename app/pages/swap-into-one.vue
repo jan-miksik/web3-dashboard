@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useTxComposer } from '~/composables/useTxComposer'
-import { CHAIN_METADATA } from '~/utils/chains'
-import type { ChainMetadata } from '~/utils/chains'
+import { computed, onUnmounted, ref } from 'vue'
+import { clearBatchCapabilitiesCache } from '~/composables/useBatchTransaction'
+import { useTxComposer, clearQuoteCache } from '~/composables/useTxComposer'
+import {
+  CHAIN_METADATA,
+  getChainName,
+  sortChainsByValue,
+  aggregateUsdByChainId,
+} from '~/utils/chains'
 
 useHead({ title: 'Swap into One | Web3 Dashboard' })
 
@@ -49,17 +54,6 @@ const hasInvalidRange = computed(() => {
   return minUsdValue.value > maxUsdValue.value
 })
 
-const sortChainsByValue = (
-  chains: ChainMetadata[],
-  balances: Record<number, number>
-): ChainMetadata[] => {
-  return [...chains].sort((a, b) => {
-    const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
-    if (diff !== 0) return diff
-    return a.name.localeCompare(b.name)
-  })
-}
-
 // Chain filter logic
 const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 0) {
@@ -68,20 +62,14 @@ const selectedChainsDisplay = computed(() => {
   if (selectedChainIds.value.size === 1) {
     const chainId = Array.from(selectedChainIds.value)[0]
     if (chainId !== undefined) {
-      return CHAIN_METADATA.find(c => c.id === chainId)?.name || 'Unknown'
+      return getChainName(chainId)
     }
     return 'Unknown'
   }
   return `${selectedChainIds.value.size} Chains`
 })
 
-const chainBalances = computed(() => {
-  const balances: Record<number, number> = {}
-  allTokens.value.forEach(t => {
-    balances[t.chainId] = (balances[t.chainId] || 0) + t.usdValue
-  })
-  return balances
-})
+const chainBalances = computed(() => aggregateUsdByChainId(allTokens.value))
 
 const chainsWithAssets = computed(() => {
   const chainIdsInTokens = new Set(allTokens.value.map(t => t.chainId))
@@ -113,6 +101,23 @@ const onClickAllNetworks = () => {
   selectedChainIds.value = new Set()
   showChainFilter.value = false
 }
+
+const isCacheRefreshed = ref(false)
+let cacheRefreshTimeout: ReturnType<typeof setTimeout> | null = null
+
+function onRefreshCache() {
+  clearBatchCapabilitiesCache()
+  clearQuoteCache()
+  isCacheRefreshed.value = true
+  if (cacheRefreshTimeout) clearTimeout(cacheRefreshTimeout)
+  cacheRefreshTimeout = setTimeout(() => {
+    isCacheRefreshed.value = false
+  }, 2000)
+}
+
+onUnmounted(() => {
+  if (cacheRefreshTimeout) clearTimeout(cacheRefreshTimeout)
+})
 </script>
 
 <template>
@@ -123,14 +128,40 @@ const onClickAllNetworks = () => {
         <span>Dashboard</span>
       </NuxtLink>
       <div class="swap-into-one-page__header-main">
-        <h1 class="swap-into-one-page__title">Swap into One</h1>
-        <div class="swap-into-one-page__warning-banner">
-          <div class="swap-into-one-page__warning-icon">⚠️</div>
-          <div class="swap-into-one-page__warning-content">
-            <strong>Development & Testing</strong>
-            <p>Use with caution. Verify transactions before confirming.</p>
+        <div class="swap-into-one-page__header-main-left">
+          <h1 class="swap-into-one-page__title">Swap into One</h1>
+          <div class="swap-into-one-page__warning-banner">
+            <div class="swap-into-one-page__warning-icon">⚠️</div>
+            <div class="swap-into-one-page__warning-content">
+              <strong>Development & Testing</strong>
+              <p>Use with caution. Verify transactions before confirming.</p>
+            </div>
           </div>
         </div>
+        <button
+          type="button"
+          class="swap-into-one-page__refresh-cache-btn"
+          :class="{ 'swap-into-one-page__refresh-cache-btn--refreshed': isCacheRefreshed }"
+          :title="isCacheRefreshed ? 'Refreshed' : 'Refresh caches (quotes, batching)'"
+          aria-label="Refresh caches"
+          @click="onRefreshCache"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+        </button>
       </div>
       <p class="swap-into-one-page__subtitle">
         Select tokens across chains, swap or bridge them into a single asset.
@@ -223,10 +254,47 @@ const onClickAllNetworks = () => {
 
 .swap-into-one-page__header-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 8px;
+}
+
+.swap-into-one-page__header-main-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.swap-into-one-page__refresh-cache-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swap-into-one-page__refresh-cache-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.swap-into-one-page__refresh-cache-btn--refreshed {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .swap-into-one-page__warning-banner {

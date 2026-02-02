@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { type ComposerToken, useTxComposer } from '~/composables/useTxComposer'
-import { handleError } from '~/utils/error-handler'
-import { formatUsdValueParts } from '~/utils/format'
+import { getTokenKey } from '~/utils/tokenKey'
+import { shortenAddress, formatUsdValueParts } from '~/utils/format'
+import { useCopyToClipboard } from '~/composables/useCopyToClipboard'
 
 const props = defineProps<{
   tokens: ComposerToken[]
@@ -22,7 +23,7 @@ const groupedTokens = computed(() => {
 
 const isChainSelected = (chainTokens: ComposerToken[]) => {
   if (chainTokens.length === 0) return false
-  return chainTokens.every(t => props.selectedIds.has(`${t.chainId}-${t.address}`))
+  return chainTokens.every(t => props.selectedIds.has(getTokenKey(t)))
 }
 
 const toggleChainSelection = (chainTokens: ComposerToken[]) => {
@@ -33,32 +34,9 @@ const toggleChainSelection = (chainTokens: ComposerToken[]) => {
   }
 }
 
-function shortenAddress(addr: string): string {
-  if (!addr) return ''
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-}
-
-const copiedAddress = ref<string | null>(null)
-let copyTimeout: ReturnType<typeof setTimeout> | null = null
-
-const formatUsdValue = (value: number) => formatUsdValueParts(value)
-
-async function copyTokenAddress(address: string) {
-  try {
-    await navigator.clipboard.writeText(address)
-    copiedAddress.value = address
-    if (copyTimeout) clearTimeout(copyTimeout)
-    copyTimeout = setTimeout(() => {
-      copiedAddress.value = null
-    }, 2000)
-  } catch (error) {
-    handleError(error, {
-      message: 'Failed to copy address to clipboard',
-      context: { address },
-      showNotification: true,
-    })
-  }
-}
+const { copy: copyTokenAddress, copiedValue: copiedAddress } = useCopyToClipboard({
+  clearAfterMs: 2000,
+})
 </script>
 
 <template>
@@ -119,9 +97,9 @@ async function copyTokenAddress(address: string) {
             </div>
 
             <div class="token-value">
-              <span>{{ formatUsdValue(token.usdValue).main }}</span>
-              <span v-if="formatUsdValue(token.usdValue).extra" class="usd-sub-decimals">
-                {{ formatUsdValue(token.usdValue).extra }}
+              <span>{{ formatUsdValueParts(token.usdValue).main }}</span>
+              <span v-if="formatUsdValueParts(token.usdValue).extra" class="usd-sub-decimals">
+                {{ formatUsdValueParts(token.usdValue).extra }}
               </span>
             </div>
 

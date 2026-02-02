@@ -47,7 +47,7 @@ describe('ConnectButton', () => {
     expect(button.classes()).not.toContain('connected')
   })
 
-  it('should render wallet menu button when connected', async () => {
+  it('should render wallet address when connected', async () => {
     mockUseConnection.mockReturnValue({
       isConnected: ref(true),
       address: ref('0x1234567890123456789012345678901234567890'),
@@ -57,7 +57,8 @@ describe('ConnectButton', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="connect-button"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="connect-button-text"]').text()).toContain('Wallet Menu')
+    // Should show shortened address format: 0x1234...7890
+    expect(wrapper.find('[data-testid="connect-button-address"]').text()).toBe('0x1234...7890')
     expect(wrapper.find('[data-testid="connect-button"]').classes()).toContain('connected')
   })
 

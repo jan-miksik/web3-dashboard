@@ -1,7 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import type { Route } from '@lifi/sdk'
 import type { ComposerToken } from '~/composables/useTxComposer'
 import type { QuoteState } from './types'
-import { formatUsdValueParts } from '~/utils/format'
+import { formatUsdValueParts, type UsdDisplay } from '~/utils/format'
+
+/** Type guard: return route when quote is ok, null otherwise. */
+function getQuoteRoute(quote: QuoteState | undefined): Route | null {
+  return quote?.status === 'ok' ? quote.route : null
+}
+
+/** Return error message when quote has error status. */
+function getQuoteErrorMessage(quote: QuoteState | undefined): string | null {
+  return quote?.status === 'error' ? quote.message : null
+}
 
 const props = defineProps<{
   selectedTokens: ComposerToken[]
@@ -39,7 +51,25 @@ const emit = defineEmits<{
   (e: 'update:amount-draft', v: { key: string; value: string }): void
 }>()
 
-const formatUsdValue = (value: number) => formatUsdValueParts(value)
+/** Format parts once per token for effective USD value. */
+const effectiveUsdPartsByKey = computed<Record<string, UsdDisplay>>(() => {
+  const o: Record<string, UsdDisplay> = {}
+  props.selectedTokens.forEach(t => {
+    o[props.tokenKey(t)] = formatUsdValueParts(props.getEffectiveUsdValue(t))
+  })
+  return o
+})
+
+/** Format parts once per token for quote output USD (when quote is ok). */
+const quoteUsdPartsByKey = computed<Record<string, UsdDisplay>>(() => {
+  const o: Record<string, UsdDisplay> = {}
+  props.selectedTokens.forEach(t => {
+    const route = getQuoteRoute(props.quotes[props.tokenKey(t)])
+    const usd = Number(route?.toAmountUSD ?? 0)
+    o[props.tokenKey(t)] = formatUsdValueParts(usd)
+  })
+  return o
+})
 
 function onSendDefaultInput(e: Event) {
   const input = e.target as HTMLInputElement
@@ -75,7 +105,9 @@ function onApplyDefaultPercentToAllSelected() {
     <div class="composer-preview__header">
       <div class="composer-preview__title">Transaction Preview</div>
       <div class="composer-preview__header-right">
-        <div class="composer-preview__subtitle">{{ props.poweredByText }}</div>
+        <div v-if="props.showRouteDetails" class="composer-preview__subtitle">
+          {{ props.poweredByText }}
+        </div>
         <label class="composer-preview__details-toggle">
           <input
             :checked="props.showRouteDetails"
@@ -244,12 +276,12 @@ function onApplyDefaultPercentToAllSelected() {
                   </div>
                   <div class="composer-preview__token-meta-right">
                     <div class="composer-preview__usd-value">
-                      <span>{{ formatUsdValue(props.getEffectiveUsdValue(t)).main }}</span>
+                      <span>{{ effectiveUsdPartsByKey[props.tokenKey(t)]?.main ?? '$0.00' }}</span>
                       <span
-                        v-if="formatUsdValue(props.getEffectiveUsdValue(t)).extra"
+                        v-if="effectiveUsdPartsByKey[props.tokenKey(t)]?.extra"
                         class="composer-preview__usd-sub-decimals"
                       >
-                        {{ formatUsdValue(props.getEffectiveUsdValue(t)).extra }}
+                        {{ effectiveUsdPartsByKey[props.tokenKey(t)]?.extra }}
                       </span>
                     </div>
                   </div>
@@ -279,7 +311,7 @@ function onApplyDefaultPercentToAllSelected() {
             </template>
             <template v-else-if="props.quotes[props.tokenKey(t)]?.status === 'error'">
               <div class="composer-preview__error">
-                {{ (props.quotes[props.tokenKey(t)] as any).message }}
+                {{ getQuoteErrorMessage(props.quotes[props.tokenKey(t)]) }}
               </div>
             </template>
             <template v-else-if="props.quotes[props.tokenKey(t)]?.status === 'ok'">
@@ -331,28 +363,12 @@ function onApplyDefaultPercentToAllSelected() {
                     </div>
                     <div class="composer-preview__token-meta-right">
                       <div class="composer-preview__usd-value">
-                        <span>{{
-                          formatUsdValue(
-                            Number((props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0)
-                          ).main
-                        }}</span>
+                        <span>{{ quoteUsdPartsByKey[props.tokenKey(t)]?.main ?? '$0.00' }}</span>
                         <span
-                          v-if="
-                            formatUsdValue(
-                              Number(
-                                (props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0
-                              )
-                            ).extra
-                          "
+                          v-if="quoteUsdPartsByKey[props.tokenKey(t)]?.extra"
                           class="composer-preview__usd-sub-decimals"
                         >
-                          {{
-                            formatUsdValue(
-                              Number(
-                                (props.quotes[props.tokenKey(t)] as any).route.toAmountUSD ?? 0
-                              )
-                            ).extra
-                          }}
+                          {{ quoteUsdPartsByKey[props.tokenKey(t)]?.extra }}
                         </span>
                       </div>
                     </div>
@@ -555,6 +571,7 @@ function onApplyDefaultPercentToAllSelected() {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 700;
+  margin-left: -0.5rem;
 }
 
 .composer-preview__send-default-max-btn {
@@ -640,8 +657,8 @@ function onApplyDefaultPercentToAllSelected() {
 
 .composer-preview__cancel-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 5px;
+  right: 5px;
   width: 20px;
   height: 20px;
   display: flex;

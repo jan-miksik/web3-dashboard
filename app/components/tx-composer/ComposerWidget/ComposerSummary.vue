@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { formatUsdValueParts } from '~/utils/format'
 
 const props = defineProps<{
@@ -7,10 +8,12 @@ const props = defineProps<{
   totalValueOut: number
   formattedTotalOutput: string
   outputTokenSymbol: string
+  outputTokenLogoUrl?: string
   hasOutQuotes: boolean
 }>()
 
-const formatUsdValue = (value: number) => formatUsdValueParts(value)
+const totalValueInParts = computed(() => formatUsdValueParts(props.totalValueIn))
+const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOut))
 </script>
 
 <template>
@@ -23,12 +26,9 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
       <div class="composer-summary__stat">
         <label class="composer-summary__label">Total Sell</label>
         <div class="composer-summary__value">
-          <span>{{ formatUsdValue(props.totalValueIn).main }}</span>
-          <span
-            v-if="formatUsdValue(props.totalValueIn).extra"
-            class="composer-summary__usd-sub-decimals"
-          >
-            {{ formatUsdValue(props.totalValueIn).extra }}
+          <span>{{ totalValueInParts.main }}</span>
+          <span v-if="totalValueInParts.extra" class="composer-summary__usd-sub-decimals">
+            {{ totalValueInParts.extra }}
           </span>
         </div>
       </div>
@@ -36,12 +36,20 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
         <label class="composer-summary__label">Total Receive</label>
         <div class="composer-summary__value">
           <span>{{ props.formattedTotalOutput }}</span>
-          <span v-if="props.hasOutQuotes" class="composer-summary__muted-symbol">
+          <img
+            v-if="props.outputTokenLogoUrl"
+            :src="props.outputTokenLogoUrl"
+            :alt="props.outputTokenSymbol"
+            class="composer-summary__token-icon"
+          />
+          <span
+            v-if="props.outputTokenSymbol && props.outputTokenSymbol !== 'Select target'"
+            class="composer-summary__muted-symbol"
+          >
             {{ props.outputTokenSymbol }}
           </span>
           <span v-if="props.hasOutQuotes" class="composer-summary__usd-value-inline">
-            ({{ formatUsdValue(props.totalValueOut).main
-            }}{{ formatUsdValue(props.totalValueOut).extra }})
+            ({{ totalValueOutParts.main }}{{ totalValueOutParts.extra }})
           </span>
         </div>
       </div>
@@ -84,6 +92,14 @@ const formatUsdValue = (value: number) => formatUsdValueParts(value)
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
+}
+
+.composer-summary__token-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .composer-summary__muted-symbol {

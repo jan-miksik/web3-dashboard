@@ -104,7 +104,8 @@ export function useTransactionHistory(address?: MaybeRef<string | null | undefin
   const updateTransaction = (hash: string, chainId: number, patch: Partial<AppTxRecord>) => {
     const idx = records.value.findIndex(r => r.hash === hash && r.chainId === chainId)
     if (idx >= 0) {
-      records.value[idx] = { ...records.value[idx], ...patch }
+      const existing = records.value[idx]
+      records.value[idx] = { ...existing, ...patch } as AppTxRecord
     } else {
       records.value = [
         { hash, chainId, source: 'app', status: 'pending', timestamp: Date.now(), ...patch },

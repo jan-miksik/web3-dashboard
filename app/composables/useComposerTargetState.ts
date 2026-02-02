@@ -1,10 +1,22 @@
-import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { getPublicClient } from '@wagmi/core'
 import { useConfig, type Config } from '@wagmi/vue'
 import { isAddress, parseAbi, zeroAddress, type Address } from 'viem'
-import { CHAIN_METADATA, type ChainMetadata } from '~/utils/chains'
-import { handleError } from '~/utils/error-handler'
-import { getCommonTokens, getGasTokenName, getUSDCAddress } from '~/utils/tokenAddresses'
+import {
+  CHAIN_METADATA,
+  getChainName,
+  getChainIcon,
+  sortChainsByValue,
+  aggregateUsdByChainId,
+} from '~/utils/chains'
+import { shortenAddress as shortenAddressUtil } from '~/utils/format'
+import { useCopyToClipboard } from '~/composables/useCopyToClipboard'
+import {
+  getCommonTokens,
+  getGasTokenName,
+  getUSDCAddress,
+  ETH_ICON_URL,
+} from '~/utils/tokenAddresses'
 import type { ResolvedToken, TargetAssetMode } from '~/components/tx-composer/ComposerWidget/types'
 
 type TokenWithChainAndUsd = { chainId: number; usdValue: number }
@@ -31,7 +43,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   })
   const selectedTargetChainDisplay = computed(() => {
     if (targetChainId.value === null) return 'Select chain'
-    return CHAIN_METADATA.find(c => c.id === targetChainId.value)?.name ?? 'Unknown'
+    return getChainName(targetChainId.value)
   })
   const isTargetChainSelected = (chainId: number): boolean => targetChainId.value === chainId
   const onToggleTargetChain = (chainId: number) => {
@@ -55,24 +67,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     }
   })
 
-  const sortChainsByValue = (
-    chains: ChainMetadata[],
-    balances: Record<number, number>
-  ): ChainMetadata[] => {
-    return [...chains].sort((a, b) => {
-      const diff = (balances[b.id] ?? 0) - (balances[a.id] ?? 0)
-      if (diff !== 0) return diff
-      return a.name.localeCompare(b.name)
-    })
-  }
-
-  const chainBalances = computed(() => {
-    const balances: Record<number, number> = {}
-    allTokens.value.forEach(t => {
-      balances[t.chainId] = (balances[t.chainId] || 0) + t.usdValue
-    })
-    return balances
-  })
+  const chainBalances = computed(() => aggregateUsdByChainId(allTokens.value))
 
   const chainsByBalance = computed(() => sortChainsByValue(CHAIN_METADATA, chainBalances.value))
 
@@ -157,16 +152,16 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     return 'Custom token'
   })
 
-  const getChainIconUrl = (chainId: number): string | undefined => {
-    return CHAIN_METADATA.find(c => c.id === chainId)?.icon
-  }
+  const getChainIconUrl = (chainId: number): string | undefined => getChainIcon(chainId)
 
   const targetAssetOptions = computed(() => {
+    const nativeIcon =
+      gasTokenName.value === 'ETH' ? ETH_ICON_URL : getChainIconUrl(targetChainId.value ?? 0)
     const options: Array<{ id: string; label: string; icon?: string }> = [
       {
         id: 'native',
         label: `${gasTokenName.value} (Native)`,
-        icon: getChainIconUrl(targetChainId.value ?? 0),
+        icon: nativeIcon,
       },
       {
         id: 'usdc',
@@ -230,35 +225,10 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     resolvedCustomToken.value = token
   }
 
-  // Address copy for target token
-  const copiedAddress = ref<string | null>(null)
-  let copyTimeout: ReturnType<typeof setTimeout> | null = null
-
-  function shortenAddress(addr: string): string {
-    if (!addr) return ''
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
-
-  async function copyAddress(addr: string) {
-    try {
-      await navigator.clipboard.writeText(addr)
-      copiedAddress.value = addr
-      if (copyTimeout) clearTimeout(copyTimeout)
-      copyTimeout = setTimeout(() => {
-        copiedAddress.value = null
-      }, 2000)
-    } catch (error) {
-      handleError(error, {
-        message: 'Failed to copy address to clipboard',
-        context: { address: addr },
-        showNotification: true,
-      })
-    }
-  }
-
-  onUnmounted(() => {
-    if (copyTimeout) clearTimeout(copyTimeout)
+  const { copy: copyAddress, copiedValue: copiedAddress } = useCopyToClipboard({
+    clearAfterMs: 2000,
   })
+  const shortenAddress = shortenAddressUtil
 
   return {
     // chains

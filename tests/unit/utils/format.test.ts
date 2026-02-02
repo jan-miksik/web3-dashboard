@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { formatUsdValueParts, formatUsdValueString } from '../../../app/utils/format'
+import {
+  shortenAddress,
+  formatUsdValueParts,
+  formatUsdValueString,
+} from '../../../app/utils/format'
 
 /**
  * format.test.ts
@@ -9,6 +13,20 @@ import { formatUsdValueParts, formatUsdValueString } from '../../../app/utils/fo
  * must render correctly. Regressions here directly affect user trust.
  */
 describe('format', () => {
+  describe('shortenAddress', () => {
+    it('shortens address to 6...4 by default', () => {
+      expect(shortenAddress('0x1234567890abcdef1234567890abcdef12345678')).toBe('0x1234...5678')
+    })
+
+    it('returns empty string for empty input', () => {
+      expect(shortenAddress('')).toBe('')
+    })
+
+    it('returns full string when shorter than start+end', () => {
+      expect(shortenAddress('0x1234')).toBe('0x1234')
+    })
+  })
+
   describe('formatUsdValueParts', () => {
     it('returns $0.00 for zero or non-finite values', () => {
       expect(formatUsdValueParts(0)).toEqual({ main: '$0.00', extra: null })

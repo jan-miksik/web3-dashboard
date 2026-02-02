@@ -10,6 +10,7 @@ import {
 } from '@lifi/sdk'
 import { useConnectorClient, useSwitchChain, useConfig } from '@wagmi/vue'
 import { getWalletClient } from '@wagmi/core'
+import { getTokenKey } from '~/utils/tokenKey'
 import { logger } from '~/utils/logger'
 
 // Initialize LiFi SDK (module singleton)
@@ -35,8 +36,18 @@ const selectedTokenIds = ref<Set<string>>(new Set())
 // If not set, uses full balance
 const customAmounts = ref<Map<string, string>>(new Map())
 
-// Default percentage of balance to select when user clicks an asset (0–100)
-const defaultSelectionPercent = ref(100)
+const DEFAULT_SELECTION_PERCENT_KEY = 'web3-dashboard-default-selection-percent'
+
+function loadDefaultSelectionPercent(): number {
+  if (typeof window === 'undefined') return 100
+  const stored = localStorage.getItem(DEFAULT_SELECTION_PERCENT_KEY)
+  if (stored == null) return 100
+  const num = Number.parseFloat(stored)
+  return Number.isFinite(num) ? Math.min(100, Math.max(0, num)) : 100
+}
+
+// Default percentage of balance to select when user clicks an asset (0–100), persisted in localStorage
+const defaultSelectionPercent = ref(loadDefaultSelectionPercent())
 
 const isExecuting = ref(false)
 const executionStatus = ref<string>('')
@@ -71,6 +82,11 @@ function buildQuoteCacheKey(p: QuoteKeyParams): string {
     p.fromAddress.toLowerCase(),
     p.toAddress.toLowerCase(),
   ].join(':')
+}
+
+/** Clear in-memory quote cache (LI.FI routes). Call to force fresh quotes. */
+export function clearQuoteCache(): void {
+  quoteCache.clear()
 }
 
 export function useTxComposer() {
@@ -109,12 +125,12 @@ export function useTxComposer() {
       })
       .map(t => ({
         ...t,
-        selected: selectedTokenIds.value.has(`${t.chainId}-${t.address}`),
+        selected: selectedTokenIds.value.has(getTokenKey(t)),
       }))
   })
 
   const selectedTokens = computed<ComposerToken[]>(() => {
-    return filteredTokens.value.filter(t => selectedTokenIds.value.has(`${t.chainId}-${t.address}`))
+    return filteredTokens.value.filter(t => selectedTokenIds.value.has(getTokenKey(t)))
   })
 
   const applyDefaultPercentToToken = (token: Token) => {
@@ -131,14 +147,14 @@ export function useTxComposer() {
 
   const applyDefaultPercentToAllSelected = () => {
     for (const token of filteredTokens.value) {
-      if (selectedTokenIds.value.has(`${token.chainId}-${token.address}`)) {
+      if (selectedTokenIds.value.has(getTokenKey(token))) {
         applyDefaultPercentToToken(token)
       }
     }
   }
 
   const toggleToken = (token: Token) => {
-    const id = `${token.chainId}-${token.address}`
+    const id = getTokenKey(token)
     const newSet = new Set(selectedTokenIds.value)
     if (newSet.has(id)) {
       newSet.delete(id)
@@ -155,7 +171,7 @@ export function useTxComposer() {
     const prev = selectedTokenIds.value
     const newSet = new Set(selectedTokenIds.value)
     tokens.forEach(t => {
-      const id = `${t.chainId}-${t.address}`
+      const id = getTokenKey(t)
       const isNew = !prev.has(id)
       newSet.add(id)
       if (isNew) applyDefaultPercentToToken(t)
@@ -165,7 +181,7 @@ export function useTxComposer() {
 
   const deselectTokens = (tokens: Token[]) => {
     const newSet = new Set(selectedTokenIds.value)
-    tokens.forEach(t => newSet.delete(`${t.chainId}-${t.address}`))
+    tokens.forEach(t => newSet.delete(getTokenKey(t)))
     selectedTokenIds.value = newSet
   }
 
@@ -173,9 +189,6 @@ export function useTxComposer() {
     selectedTokenIds.value = new Set()
     customAmounts.value = new Map()
   }
-
-  const getTokenKey = (token: { chainId: number; address: string }) =>
-    `${token.chainId}-${token.address}`
 
   const getCustomAmount = (token: Token): string | null => {
     return customAmounts.value.get(getTokenKey(token)) ?? null
@@ -311,6 +324,7 @@ export function useTxComposer() {
   }
 
   return {
+    getTokenKey,
     // Data
     allTokens,
     filteredTokens,
@@ -340,7 +354,11 @@ export function useTxComposer() {
     defaultSelectionPercent,
     setDefaultSelectionPercent: (pct: number) => {
       const clamped = Math.min(100, Math.max(0, pct))
-      defaultSelectionPercent.value = Number.isFinite(clamped) ? clamped : 100
+      const value = Number.isFinite(clamped) ? clamped : 100
+      defaultSelectionPercent.value = value
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DEFAULT_SELECTION_PERCENT_KEY, String(value))
+      }
     },
     applyDefaultPercentToAllSelected,
 

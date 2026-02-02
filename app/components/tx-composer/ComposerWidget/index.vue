@@ -18,10 +18,10 @@ const { address } = useConnection()
 const { watchedAddress } = useWatchedAddress()
 const useBatching = ref(true)
 const showRouteDetails = ref(false)
-
-const tokenKey = (t: { chainId: number; address: string }) => `${t.chainId}-${t.address}`
+const isExecuteUiPending = ref(false)
 
 const {
+  getTokenKey,
   allTokens,
   selectedTokens,
   getRouteQuote,
@@ -37,6 +37,8 @@ const {
   setDefaultSelectionPercent,
   applyDefaultPercentToAllSelected,
 } = useTxComposer()
+
+const tokenKey = getTokenKey
 
 const {
   executeComposer,
@@ -206,8 +208,28 @@ const canExecute = computed(() => {
   if (selectedTokens.value.length === 0) return false
   if (targetChainId.value === null) return false
   if (!targetTokenAddress.value) return false
-  if (isExecuting.value || isBatching.value || isCheckingSupport.value) return false
+  if (isExecuteUiPending.value || isExecuting.value || isBatching.value || isCheckingSupport.value)
+    return false
   return true
+})
+
+const showExecuteSpinner = computed(() => {
+  return (
+    isExecuteUiPending.value || isExecuting.value || isBatching.value || isCheckingSupport.value
+  )
+})
+
+const executeButtonTextUi = computed(() => {
+  // Immediate feedback after click, before downstream composables flip their flags.
+  if (
+    isExecuteUiPending.value &&
+    !isExecuting.value &&
+    !isBatching.value &&
+    !isCheckingSupport.value
+  ) {
+    return 'Starting...'
+  }
+  return executeButtonText.value
 })
 
 const onExecute = async () => {
@@ -243,6 +265,13 @@ const onExecute = async () => {
       return
     }
 
+    // Flip UI state synchronously so the button reacts immediately on click.
+    // Then yield to allow the browser to paint the spinner/pressed styles
+    // before any heavier async preparation begins.
+    isExecuteUiPending.value = true
+    await nextTick()
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
     await executeComposer({
       targetChainId: targetChainId.value,
       targetTokenAddress: targetTokenAddress.value,
@@ -264,6 +293,8 @@ const onExecute = async () => {
       },
       showNotification: true,
     })
+  } finally {
+    isExecuteUiPending.value = false
   }
 }
 
@@ -285,6 +316,11 @@ const getTargetChainName = () => {
   if (targetChainId.value === null) return ''
   return CHAIN_METADATA.find(c => c.id === targetChainId.value)?.name ?? ''
 }
+
+const outputTokenLogoUrl = computed(() => {
+  const first = selectedTokens.value[0]
+  return first ? getOutputLogo(first) : undefined
+})
 </script>
 
 <template>
@@ -295,6 +331,7 @@ const getTargetChainName = () => {
       :total-value-out="totalValueOut"
       :formatted-total-output="formattedTotalOutput"
       :output-token-symbol="outputTokenSymbol"
+      :output-token-logo-url="outputTokenLogoUrl"
       :has-out-quotes="hasOutQuotes"
     />
 
@@ -376,12 +413,15 @@ const getTargetChainName = () => {
         :transactions="allTransactions"
       />
 
-      <button class="composer-widget__execute-btn" :disabled="!canExecute" @click="onExecute">
-        <span
-          v-if="isExecuting || isBatching || isCheckingSupport"
-          class="composer-widget__spinner"
-        ></span>
-        {{ executeButtonText }}
+      <button
+        class="composer-widget__execute-btn"
+        :disabled="!canExecute"
+        :aria-busy="showExecuteSpinner"
+        :data-loading="showExecuteSpinner ? 'true' : 'false'"
+        @click="onExecute"
+      >
+        <span v-if="showExecuteSpinner" class="composer-widget__spinner"></span>
+        {{ executeButtonTextUi }}
       </button>
     </div>
   </div>
@@ -453,11 +493,39 @@ const getTargetChainName = () => {
   justify-content: center;
   gap: 8px;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 120ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    opacity 160ms ease;
+  will-change: transform;
+}
+
+.composer-widget__execute-btn:not(:disabled):hover {
+  filter: brightness(1.05) saturate(1.05);
+  box-shadow: 0 6px 18px rgba(60, 179, 113, 0.36);
+  transform: translateY(-1px);
+}
+
+.composer-widget__execute-btn:not(:disabled):active {
+  filter: brightness(0.98);
+  box-shadow: 0 3px 10px rgba(60, 179, 113, 0.28);
+  transform: translateY(0px);
+}
+
+.composer-widget__execute-btn:focus-visible {
+  outline: 3px solid rgba(60, 179, 113, 0.45);
+  outline-offset: 3px;
+}
+
+.composer-widget__execute-btn[data-loading='true'] {
+  cursor: progress;
 }
 
 .composer-widget__execute-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .composer-widget__spinner {

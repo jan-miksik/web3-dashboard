@@ -1,17 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import {
-  showErrorNotification,
-  showWarningNotification,
-  showInfoNotification,
-  showSuccessNotification,
-} from '~/composables/useNotifications'
 import { useRuntimeConfig } from '#app'
 import { useRoute } from 'vue-router'
 
 const runtimeConfig = useRuntimeConfig()
 const hasProjectId = !!runtimeConfig.public.reownProjectId
-const isDev = import.meta.dev
 const route = useRoute()
 
 const sidebarItems = [
@@ -22,25 +15,6 @@ const sidebarItems = [
 const isNavItemActive = (path: string) => {
   if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
-}
-
-const SHOW_TEST_NOTIFICATIONS = false
-
-// Test notification functions (dev only)
-function testError() {
-  showErrorNotification('This is a test error notification')
-}
-
-function testWarning() {
-  showWarningNotification('This is a test warning notification')
-}
-
-function testInfo() {
-  showInfoNotification('This is a test info notification')
-}
-
-function testSuccess() {
-  showSuccessNotification('This is a test success notification')
 }
 
 // Calculate and reserve scrollbar width to prevent layout shift
@@ -99,18 +73,6 @@ onUnmounted(() => {
       </div>
 
       <div class="header-right">
-        <!-- Test notification buttons (dev only) -->
-        <div v-if="isDev && SHOW_TEST_NOTIFICATIONS" class="test-notifications">
-          <button class="test-btn test-btn-error" title="Test Error" @click="testError">✖</button>
-          <button class="test-btn test-btn-warning" title="Test Warning" @click="testWarning">
-            ⚠
-          </button>
-          <button class="test-btn test-btn-info" title="Test Info" @click="testInfo">ⓘ</button>
-          <button class="test-btn test-btn-success" title="Test Success" @click="testSuccess">
-            ✔
-          </button>
-        </div>
-
         <!-- Show AppKit button when Project ID is configured -->
         <template v-if="hasProjectId">
           <ConnectButton />
@@ -231,63 +193,6 @@ onUnmounted(() => {
 
 .setup-text {
   font-family: var(--font-mono);
-}
-
-/* Test notification buttons (dev only) */
-.test-notifications {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 12px;
-  padding-right: 12px;
-  border-right: 1px solid var(--border-color);
-}
-
-.test-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 0;
-  color: var(--text-secondary);
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.test-btn:hover {
-  background: var(--bg-hover);
-  transform: scale(1.1);
-}
-
-.test-btn:active {
-  transform: scale(0.95);
-}
-
-.test-btn-error:hover {
-  border-color: var(--error);
-  background: var(--error-muted);
-}
-
-.test-btn-warning:hover {
-  border-color: var(--warning);
-  background: var(--warning-muted);
-}
-
-.test-btn-info:hover {
-  border-color: var(--accent-primary);
-  background: var(--accent-muted);
-}
-
-.test-btn-success:hover {
-  border-color: var(--success);
-  background: var(--success-muted);
 }
 
 /* Main Container */
@@ -454,18 +359,6 @@ onUnmounted(() => {
 
   .setup-text {
     display: none;
-  }
-
-  .test-notifications {
-    margin-right: 8px;
-    padding-right: 8px;
-    gap: 6px;
-  }
-
-  .test-btn {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
   }
 }
 </style>
