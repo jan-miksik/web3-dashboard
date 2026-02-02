@@ -11,8 +11,11 @@ import { useComposerAmountDrafts } from '~/composables/useComposerAmountDrafts'
 import { useComposerQuotes } from '~/composables/useComposerQuotes'
 import { useComposerBatchSupport } from '~/composables/useComposerBatchSupport'
 import { useComposerBatchingUi } from '~/composables/useComposerBatchingUi'
+import { useTransactionHistory } from '~/composables/useTransactionHistory'
+import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
 const { address } = useConnection()
+const { watchedAddress } = useWatchedAddress()
 const useBatching = ref(true)
 const showRouteDetails = ref(false)
 
@@ -87,6 +90,19 @@ const skippedSameTokenSymbols = computed(() => {
 
 const connectedAddress = computed<string | null>(() => {
   return address.value ? String(address.value) : null
+})
+
+const effectiveAddress = computed<string | null>(() => {
+  if (address.value) {
+    return String(address.value)
+  }
+  return watchedAddress.value
+})
+
+const { latestSuccess, allTransactions } = useTransactionHistory(effectiveAddress.value)
+
+const showRecap = computed(() => {
+  return !!latestSuccess.value || allTransactions.value.length > 0
 })
 
 useComposerBatchSupport({
@@ -352,6 +368,12 @@ const getTargetChainName = () => {
         :route-tools-for-token="routeToolsForToken"
         @update:show-route-details="showRouteDetails = $event"
         @update:amount-draft="onUpdateAmountDraft"
+      />
+
+      <TxComposerComposerWidgetComposerTransactionRecap
+        v-if="showRecap"
+        :latest-success="latestSuccess"
+        :transactions="allTransactions"
       />
 
       <button class="composer-widget__execute-btn" :disabled="!canExecute" @click="onExecute">
