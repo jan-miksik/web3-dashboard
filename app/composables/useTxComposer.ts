@@ -259,13 +259,15 @@ export function useTxComposer() {
     }
   }
 
-  const executeRoute = async (route: Route) => {
+  const executeRoute = async (route: Route): Promise<{ hash?: string }> => {
     if (!walletClient.value) {
       throw new Error('No wallet client')
     }
 
     isExecuting.value = true
     executionStatus.value = 'Preparing transaction...'
+
+    let txHash: string | undefined
 
     try {
       if (walletClient.value.chain.id !== route.fromChainId) {
@@ -281,6 +283,11 @@ export function useTxComposer() {
           const status = execution?.status
           if (!status) return
 
+          // Track transaction hash from execution
+          if (execution?.txHash && !txHash) {
+            txHash = execution.txHash
+          }
+
           const statusMap: Record<string, string> = {
             PENDING: 'Transaction pending...',
             ACTION_REQUIRED: 'Action required in wallet...',
@@ -293,6 +300,7 @@ export function useTxComposer() {
       })
 
       executionStatus.value = 'Transaction complete!'
+      return { hash: txHash }
     } catch (e) {
       logger.error('Route execution failed', e)
       executionStatus.value = 'Transaction failed'

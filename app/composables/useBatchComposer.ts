@@ -6,6 +6,7 @@ import { type Route, getStepTransaction } from '@lifi/sdk'
 import type { Token } from './useTokens'
 import { useTxComposer } from './useTxComposer'
 import { useBatchTransaction, type BatchCall } from './useBatchTransaction'
+import { useTransactionHistory } from './useTransactionHistory'
 import { logger } from '~/utils/logger'
 
 const ERC20_APPROVE_SELECTOR = '0x095ea7b3'
@@ -52,6 +53,7 @@ export function useBatchComposer() {
   const { address } = useConnection()
   const config = useConfig()
   const { switchChain } = useSwitchChain()
+  const { addTransaction, shouldStoreFailure } = useTransactionHistory(address)
 
   const {
     detectCapabilities,
@@ -206,6 +208,30 @@ export function useBatchComposer() {
     return detectCapabilities(chainId)
   }
 
+  /**
+   * Creates input summary string from tokens and target info
+   */
+  const createInputSummary = (
+    tokens: Token[],
+    targetChainId: number,
+    targetTokenAddress: Address
+  ): string => {
+    const tokenCount = tokens.length
+    if (tokenCount === 0) return 'No tokens'
+    if (tokenCount === 1) {
+      const token = tokens[0]!
+      return `Swap ${token.symbol || 'token'} on chain ${token.chainId}`
+    }
+    return `Swap ${tokenCount} tokens → chain ${targetChainId}`
+  }
+
+  /**
+   * Creates output summary string from target info
+   */
+  const createOutputSummary = (targetChainId: number, targetTokenAddress: Address): string => {
+    return `Receive on chain ${targetChainId}`
+  }
+
   const executeComposer = async (args: {
     targetChainId: number
     targetTokenAddress: Address
@@ -305,13 +331,76 @@ export function useBatchComposer() {
             ? `Signing batch with EIP-7702 on ${fromChain.name}${batchProgress}...`
             : `Sending batch on ${fromChain.name} (${batchCalls.length} calls)${batchProgress}...`
 
-          const result = await executeBatch(batchCalls, fromChain)
-          results.push(result)
+          try {
+            const result = await executeBatch(batchCalls, fromChain)
+            results.push(result)
 
-          // Brief pause between batches to avoid overwhelming the wallet
-          if (batchIndex < batches.length - 1) {
-            batchStatus.value = `Batch ${batchNum}/${totalBatches} complete. Preparing next batch...`
-            await new Promise(resolve => setTimeout(resolve, 500))
+            // Record successful transaction in history
+            if (result.success && result.txHash) {
+              const inputSummary = createInputSummary(
+                args.tokens,
+                args.targetChainId,
+                args.targetTokenAddress
+              )
+              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
+
+              addTransaction({
+                hash: result.txHash,
+                chainId: fromChainId,
+                status: 'success',
+                timestamp: Date.now(),
+                source: 'app',
+                inputSummary,
+                outputSummary,
+                batchCount: totalBatches,
+              })
+            } else if (result.success && result.batchId) {
+              // EIP-5792 returns batchId instead of txHash
+              // Store with batchId for tracking
+              const inputSummary = createInputSummary(
+                args.tokens,
+                args.targetChainId,
+                args.targetTokenAddress
+              )
+              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
+
+              addTransaction({
+                hash: result.batchId, // Use batchId as hash for EIP-5792
+                chainId: fromChainId,
+                status: 'success',
+                timestamp: Date.now(),
+                source: 'app',
+                inputSummary,
+                outputSummary,
+                batchCount: totalBatches,
+                batchId: result.batchId,
+              })
+            }
+
+            // Brief pause between batches to avoid overwhelming the wallet
+            if (batchIndex < batches.length - 1) {
+              batchStatus.value = `Batch ${batchNum}/${totalBatches} complete. Preparing next batch...`
+              await new Promise(resolve => setTimeout(resolve, 500))
+            }
+          } catch (error) {
+            // Only store failure if it's not a user rejection
+            if (shouldStoreFailure(error)) {
+              const inputSummary = createInputSummary(
+                args.tokens,
+                args.targetChainId,
+                args.targetTokenAddress
+              )
+              addTransaction({
+                hash: `failed-${Date.now()}-${batchIndex}`, // Generate a unique hash for failed transactions
+                chainId: fromChainId,
+                status: 'failed',
+                timestamp: Date.now(),
+                source: 'app',
+                inputSummary,
+                batchCount: totalBatches,
+              })
+            }
+            throw error
           }
         }
       } else {
@@ -320,7 +409,46 @@ export function useBatchComposer() {
           const route = routesOnChain[i]
           if (!route) continue
           batchStatus.value = `Executing ${i + 1}/${routesOnChain.length}...`
-          await executeRoute(route)
+          try {
+            const routeResult = await executeRoute(route)
+            // Record successful sequential transaction
+            if (routeResult?.hash) {
+              const inputSummary = createInputSummary(
+                args.tokens,
+                args.targetChainId,
+                args.targetTokenAddress
+              )
+              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
+
+              addTransaction({
+                hash: routeResult.hash,
+                chainId: fromChainId,
+                status: 'success',
+                timestamp: Date.now(),
+                source: 'app',
+                inputSummary,
+                outputSummary,
+              })
+            }
+          } catch (error) {
+            // Only store failure if it's not a user rejection
+            if (shouldStoreFailure(error)) {
+              const inputSummary = createInputSummary(
+                args.tokens,
+                args.targetChainId,
+                args.targetTokenAddress
+              )
+              addTransaction({
+                hash: `failed-${Date.now()}-${i}`,
+                chainId: fromChainId,
+                status: 'failed',
+                timestamp: Date.now(),
+                source: 'app',
+                inputSummary,
+              })
+            }
+            throw error
+          }
         }
       }
     }
