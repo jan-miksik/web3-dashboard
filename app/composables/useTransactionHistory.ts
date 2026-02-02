@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { logger } from '~/utils/logger'
 
 export type AppTxStatus = 'submitted' | 'pending' | 'success' | 'failed'
 
@@ -36,8 +37,8 @@ const writeStore = (key: string, records: AppTxRecord[]) => {
   if (!isBrowser()) return
   try {
     localStorage.setItem(key, JSON.stringify(records))
-  } catch {
-    // ignore quota errors
+  } catch (error) {
+    logger.error('Failed to write transaction history to localStorage', error, { key })
   }
 }
 
@@ -58,6 +59,10 @@ export function useTransactionHistory(address?: string | null) {
 
   const addTransaction = (record: AppTxRecord) => {
     if (record.source !== 'app') return
+    if (!record.hash || record.chainId === undefined || record.chainId === null || !record.status) {
+      logger.warn('addTransaction called with invalid record', { record })
+      return
+    }
     const idx = records.value.findIndex(r => r.hash === record.hash && r.chainId === record.chainId)
     if (idx >= 0) {
       records.value[idx] = { ...records.value[idx], ...record }
