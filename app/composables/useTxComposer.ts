@@ -296,9 +296,10 @@ export function useTxComposer() {
           const status = execution?.status
           if (!status) return
 
-          // Track transaction hash from execution
-          if (execution?.txHash && !txHash) {
-            txHash = execution.txHash
+          // Track transaction hash from execution (SDK may set txHash at runtime; not on Execution type)
+          const hash = (execution as { txHash?: string } | undefined)?.txHash
+          if (hash && !txHash) {
+            txHash = hash
           }
 
           const statusMap: Record<string, string> = {
