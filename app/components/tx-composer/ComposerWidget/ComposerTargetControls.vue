@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
 import type { TargetAssetMode, ResolvedToken } from './types'
-import { useClickOutside } from '~/composables/useClickOutside'
 
 const props = defineProps<{
   // Chain selection
@@ -22,6 +21,13 @@ const props = defineProps<{
   selectedTargetOptionId: string
   selectTargetAsset: (modeOrAddress: string) => void
   selectCustomToken: (token: ResolvedToken) => void
+  ownedTokens: ResolvedToken[]
+  /** When native gas token is ETH, pass ETH icon URL so we show ETH symbol/icon instead of chain icon */
+  nativeTokenLogoUrl?: string | null
+  /** When true, auto-open token picker (e.g. after chain change couldn't map token). */
+  needsTargetTokenSelection?: boolean
+  /** Called after auto-opening the modal so the flag can be reset. */
+  dismissTargetTokenSelectionPrompt?: () => void
 
   // Contract address + copy
   targetTokenAddress: string | null
@@ -38,32 +44,84 @@ const props = defineProps<{
   supportsBatching: boolean | null
   useBatching: boolean
   batchMethod: string
+
+  // Route details toggle
+  showRouteDetails: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:show-target-chain-filter', v: boolean): void
   (e: 'update:use-batching', v: boolean): void
+  (e: 'update:show-route-details', v: boolean): void
 }>()
 
-const showTargetAssetDropdown = ref(false)
+const chainsWithAssets = computed(() => props.chainsByBalance)
+const chainsWithoutAssets = computed(() => [] as ChainMetadata[])
+
 const showTokenSelectModal = ref(false)
 
-const selectedOption = computed(() =>
-  props.targetAssetOptions.find(o => o.id === props.selectedTargetOptionId)
+watch(
+  () => props.needsTargetTokenSelection,
+  needs => {
+    if (!needs) return
+    showTokenSelectModal.value = true
+    props.dismissTargetTokenSelectionPrompt?.()
+  }
 )
 
-function onSelectTargetOption(optionId: string) {
-  if (optionId === 'custom') {
-    showTokenSelectModal.value = true
-    showTargetAssetDropdown.value = false
-    return
+const selectedChain = computed(() => {
+  if (props.targetChainId === null) return null
+  return props.chainsByBalance.find(c => c.id === props.targetChainId) ?? null
+})
+
+const hasSelectedToken = computed(() => {
+  if (props.targetChainId === null) return false
+  if (props.targetAssetMode === 'native' || props.targetAssetMode === 'usdc') return true
+  return props.resolvedCustomToken !== null
+})
+
+const selectedTokenForUi = computed(() => {
+  if (props.targetChainId === null) return null
+
+  if (props.targetAssetMode === 'native') {
+    const symbol = props.targetTokenLabel.split(' ')[0] || 'Native'
+    return {
+      logoURI: props.nativeTokenLogoUrl ?? selectedChain.value?.icon,
+      symbol,
+      name: 'Native',
+      address: null as string | null,
+    }
   }
-  props.selectTargetAsset(optionId)
-  showTargetAssetDropdown.value = false
-}
+
+  if (props.targetAssetMode === 'usdc') {
+    return {
+      logoURI:
+        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      address: props.targetTokenAddress,
+    }
+  }
+
+  if (props.resolvedCustomToken) {
+    return {
+      logoURI: props.resolvedCustomToken.logoURI,
+      symbol: props.resolvedCustomToken.symbol,
+      name: props.resolvedCustomToken.name,
+      address: props.resolvedCustomToken.address,
+    }
+  }
+
+  return null
+})
 
 function onSelectTokenFromModal(token: ResolvedToken) {
   props.selectCustomToken(token)
+  showTokenSelectModal.value = false
+}
+
+function onSelectModeFromModal(mode: 'native' | 'usdc') {
+  props.selectTargetAsset(mode)
   showTokenSelectModal.value = false
 }
 
@@ -74,160 +132,125 @@ function onSelectChainFromModal(chainId: number | null) {
   }
   props.onToggleTargetChain(chainId)
 }
-const targetAssetDropdownRef = ref<HTMLElement | null>(null)
-
-useClickOutside(targetAssetDropdownRef, () => {
-  showTargetAssetDropdown.value = false
-})
 </script>
 
 <template>
   <div class="composer-target-controls">
-    <div class="composer-target-controls__row">
-      <div class="composer-target-controls__group composer-target-controls__group--chain">
-        <label class="composer-target-controls__label">to chain</label>
-        <NetworkFilter
-          :chains-with-assets="props.chainsByBalance"
-          :chains-without-assets="[]"
-          :selected-chain-ids="props.selectedTargetChainIds"
-          :selected-chains-display="props.selectedTargetChainDisplay"
-          :show-chain-filter="props.showTargetChainFilter"
-          :is-chain-selected="props.isTargetChainSelected"
-          :on-toggle-chain="props.onToggleTargetChain"
-          :on-click-all-networks="props.onClearTargetChain"
-          :chain-balances="props.chainBalances"
-          all-networks-label="Select chain"
-          @update:show-chain-filter="emit('update:show-target-chain-filter', $event)"
-        />
+    <div class="composer-target-controls__group">
+      <div class="composer-target-controls__label-row">
+        <label class="composer-target-controls__label">To</label>
+        <button
+          v-if="selectedTokenForUi?.address"
+          type="button"
+          class="composer-target-controls__token-address-btn"
+          :class="{
+            'composer-target-controls__token-address-btn--copied':
+              props.copiedAddress === selectedTokenForUi.address,
+          }"
+          :title="
+            props.copiedAddress === selectedTokenForUi.address ? 'Copied!' : 'Copy contract address'
+          "
+          @click.stop="props.copyAddress(selectedTokenForUi.address)"
+        >
+          <span class="composer-target-controls__token-address">{{
+            props.shortenAddress(selectedTokenForUi.address)
+          }}</span>
+          <svg
+            v-if="props.copiedAddress === selectedTokenForUi.address"
+            width="10"
+            height="10"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M3 8L6.5 11.5L13 5"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <svg v-else width="10" height="10" viewBox="0 0 16 16" fill="none">
+            <rect
+              x="5.5"
+              y="5.5"
+              width="8"
+              height="8"
+              rx="1"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <path
+              d="M10.5 5.5V3.5C10.5 2.67157 9.82843 2 9 2H3.5C2.67157 2 2 2.67157 2 3.5V9C2 9.82843 2.67157 10.5 3.5 10.5H5.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+          </svg>
+        </button>
+        <label class="composer-target-controls__details-toggle">
+          <input
+            :checked="props.showRouteDetails"
+            type="checkbox"
+            class="composer-target-controls__details-toggle-input"
+            @change="emit('update:show-route-details', ($event.target as HTMLInputElement).checked)"
+          />
+          <span>Show details</span>
+        </label>
       </div>
 
-      <div
-        class="composer-target-controls__group composer-target-controls__group--asset composer-target-controls__asset-row"
-      >
-        <div class="composer-target-controls__label-with-address">
-          <label class="composer-target-controls__label">to asset</label>
-          <div
-            v-if="
-              (props.targetAssetMode === 'usdc' || props.resolvedCustomToken) &&
-              props.targetTokenAddress
-            "
-            class="composer-target-controls__inline-address"
-          >
-            <button
-              class="composer-target-controls__token-address-btn composer-target-controls__token-address-btn--mini"
-              :class="{
-                'composer-target-controls__token-address-btn--copied':
-                  props.copiedAddress === props.targetTokenAddress,
-              }"
-              :title="
-                props.copiedAddress === props.targetTokenAddress
-                  ? 'Copied!'
-                  : 'Copy contract address'
-              "
-              @click="props.copyAddress(props.targetTokenAddress)"
-            >
-              <span class="composer-target-controls__token-address">
-                {{ props.shortenAddress(props.targetTokenAddress) }}
-              </span>
-              <svg
-                v-if="props.copiedAddress === props.targetTokenAddress"
-                width="10"
-                height="10"
-                viewBox="0 0 16 16"
-                fill="none"
-              >
-                <path
-                  d="M3 8L6.5 11.5L13 5"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              <svg v-else width="10" height="10" viewBox="0 0 16 16" fill="none">
-                <rect
-                  x="5.5"
-                  y="5.5"
-                  width="8"
-                  height="8"
-                  rx="1"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                />
-                <path
-                  d="M10.5 5.5V3.5C10.5 2.67157 9.82843 2 9 2H3.5C2.67157 2 2 2.67157 2 3.5V9C2 9.82843 2.67157 10.5 3.5 10.5H5.5"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="composer-target-controls__asset-and-batch">
-          <div
-            ref="targetAssetDropdownRef"
-            class="composer-target-controls__dropdown composer-target-controls__asset-selector"
-          >
-            <button
-              class="composer-target-controls__dropdown-trigger"
-              :disabled="props.targetChainId === null"
-              @click.stop="showTargetAssetDropdown = !showTargetAssetDropdown"
-            >
-              <div class="composer-target-controls__trigger-content">
-                <img
-                  v-if="selectedOption?.icon"
-                  :src="selectedOption.icon"
-                  class="composer-target-controls__option-icon"
-                />
-                <div v-else class="composer-target-controls__option-icon-placeholder">
-                  {{
-                    selectedOption?.id === 'custom' ? '?' : (selectedOption?.label?.charAt(0) ?? '')
-                  }}
-                </div>
-                <span class="composer-target-controls__trigger-label">{{
-                  selectedOption?.label ?? props.targetTokenLabel
+      <div class="composer-target-controls__destination-row">
+        <button
+          type="button"
+          class="composer-target-controls__destination-btn"
+          :class="{
+            'composer-target-controls__destination-btn--empty': !hasSelectedToken,
+            'composer-target-controls__destination-btn--selected': hasSelectedToken,
+          }"
+          @click="showTokenSelectModal = true"
+        >
+          <template v-if="selectedTokenForUi">
+            <div class="composer-target-controls__destination-left">
+              <img
+                v-if="selectedTokenForUi.logoURI"
+                :src="selectedTokenForUi.logoURI"
+                class="composer-target-controls__token-logo"
+                alt=""
+              />
+              <div v-else class="composer-target-controls__token-logo-placeholder">
+                {{ selectedTokenForUi.symbol.slice(0, 1) }}
+              </div>
+              <div class="composer-target-controls__token-text">
+                <span class="composer-target-controls__token-symbol">{{
+                  selectedTokenForUi.symbol
+                }}</span>
+                <span class="composer-target-controls__token-name">{{
+                  selectedTokenForUi.name
                 }}</span>
               </div>
-              <span
-                class="composer-target-controls__filter-arrow"
-                :class="{
-                  'composer-target-controls__filter-arrow--rotated': showTargetAssetDropdown,
-                }"
-              >
-                ▼
-              </span>
-            </button>
-
-            <div v-if="showTargetAssetDropdown" class="composer-target-controls__dropdown-menu">
-              <button
-                v-for="option in props.targetAssetOptions"
-                :key="option.id"
-                class="composer-target-controls__dropdown-option"
-                :class="{
-                  'composer-target-controls__dropdown-option--selected':
-                    props.selectedTargetOptionId === option.id,
-                }"
-                @click="onSelectTargetOption(option.id)"
-              >
-                <img
-                  v-if="option.icon"
-                  :src="option.icon"
-                  class="composer-target-controls__option-icon"
-                />
-                <div v-else class="composer-target-controls__option-icon-placeholder">
-                  {{ option.id === 'custom' ? '?' : (option.label?.charAt(0) ?? '') }}
-                </div>
-                <span class="composer-target-controls__option-label">{{ option.label }}</span>
-                <span
-                  v-if="props.selectedTargetOptionId === option.id"
-                  class="composer-target-controls__checkmark"
-                  >✓</span
-                >
-              </button>
             </div>
-          </div>
+          </template>
+          <template v-else>
+            <span class="composer-target-controls__select-token">Select Token</span>
+          </template>
+        </button>
 
+        <div v-if="hasSelectedToken" class="composer-target-controls__chain-wrap">
+          <NetworkFilter
+            :chains-with-assets="chainsWithAssets"
+            :chains-without-assets="chainsWithoutAssets"
+            :selected-chain-ids="props.selectedTargetChainIds"
+            :selected-chains-display="props.selectedTargetChainDisplay"
+            :show-chain-filter="props.showTargetChainFilter"
+            :is-chain-selected="props.isTargetChainSelected"
+            :on-toggle-chain="props.onToggleTargetChain"
+            :on-click-all-networks="props.onClearTargetChain"
+            :chain-balances="props.chainBalances"
+            all-networks-label="Select chain"
+            @update:show-chain-filter="emit('update:show-target-chain-filter', $event)"
+          />
+        </div>
+
+        <div class="composer-target-controls__batch-wrap">
           <div v-if="props.isCheckingSupport" class="composer-target-controls__checking-status">
             <span class="composer-target-controls__checking-spinner"></span>
             Checking wallet…
@@ -254,7 +277,11 @@ useClickOutside(targetAssetDropdownRef, () => {
       :open="showTokenSelectModal"
       :chain-id="props.targetChainId"
       :current-token-address="props.targetTokenAddress"
+      :owned-tokens="props.ownedTokens"
+      :chains-by-balance="props.chainsByBalance"
+      :chain-balances="props.chainBalances"
       @select="onSelectTokenFromModal"
+      @select-mode="onSelectModeFromModal"
       @select-chain="onSelectChainFromModal"
       @close="showTokenSelectModal = false"
     />
@@ -265,170 +292,179 @@ useClickOutside(targetAssetDropdownRef, () => {
 .composer-target-controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.composer-target-controls__row {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 12px;
-  align-items: start;
+  gap: 8px;
 }
 
 .composer-target-controls__group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.composer-target-controls__label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.composer-target-controls__label-with-address {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  min-height: 18px;
-}
-
-.composer-target-controls__inline-address {
-  display: flex;
-  align-items: center;
   gap: 4px;
 }
 
-.composer-target-controls__dropdown {
-  position: relative;
-  width: 100%;
+.composer-target-controls__label-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.composer-target-controls__dropdown-trigger {
-  width: 100%;
+.composer-target-controls__details-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.composer-target-controls__details-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.composer-target-controls__details-toggle-input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.composer-target-controls__label {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.composer-target-controls__destination-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.composer-target-controls__destination-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-primary);
   transition: all 0.2s;
+  height: 48px;
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.composer-target-controls__dropdown-trigger:hover:not(:disabled) {
+.composer-target-controls__destination-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-light);
 }
 
-.composer-target-controls__dropdown-trigger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.composer-target-controls__destination-btn--empty {
+  /* Same padding as base (6px 10px) so button size matches selected state */
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  min-width: 160px;
+  width: 320px;
+  justify-content: center;
 }
 
-.composer-target-controls__trigger-content {
+.composer-target-controls__destination-btn--empty:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-muted);
+}
+
+.composer-target-controls__destination-btn--selected {
+  /* Prevent the selected token pill from growing too wide */
+  flex: 0 1 320px;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.composer-target-controls__select-token {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.composer-target-controls__chain-wrap {
+  flex: 0 1 auto;
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.composer-target-controls__chain-wrap :deep(.network-filter-btn) {
+  min-height: 48px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.composer-target-controls__destination-left {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.composer-target-controls__trigger-label {
+.composer-target-controls__token-logo,
+.composer-target-controls__token-logo-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.composer-target-controls__token-logo-placeholder {
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.composer-target-controls__token-text {
+  display: flex;
+  align-items: baseline;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.composer-target-controls__token-symbol {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.composer-target-controls__token-name {
+  font-size: 11px;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.composer-target-controls__dropdown-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  z-index: 110;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-}
-
-.composer-target-controls__dropdown-option {
+.composer-target-controls__batch-wrap {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--text-primary);
-  text-align: left;
-  transition: all 0.2s;
-}
-
-.composer-target-controls__dropdown-option:hover {
-  background: var(--bg-hover);
-}
-
-.composer-target-controls__dropdown-option--selected {
-  background: var(--accent-muted);
-}
-
-.composer-target-controls__option-icon,
-.composer-target-controls__option-icon-placeholder {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
   flex-shrink: 0;
-}
-
-.composer-target-controls__option-icon-placeholder {
-  background: var(--bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.composer-target-controls__option-label {
-  font-size: 13px;
-  font-weight: 500;
-  flex: 1;
-}
-
-.composer-target-controls__checkmark {
-  color: mediumseagreen;
-  font-weight: 700;
-}
-
-.composer-target-controls__filter-arrow {
-  font-size: 10px;
-  color: var(--text-secondary);
-  transition: transform 0.2s;
-}
-
-.composer-target-controls__filter-arrow--rotated {
-  transform: rotate(180deg);
-}
-
-.composer-target-controls__resolved-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.composer-target-controls__resolved-title {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .composer-target-controls__token-address-btn {
@@ -443,10 +479,7 @@ useClickOutside(targetAssetDropdownRef, () => {
   transition: all 0.2s;
   font-family: var(--font-mono);
   width: fit-content;
-}
-
-.composer-target-controls__token-address-btn--mini {
-  padding: 1px 4px;
+  color: var(--text-secondary);
 }
 
 .composer-target-controls__token-address-btn:hover {
@@ -462,12 +495,12 @@ useClickOutside(targetAssetDropdownRef, () => {
 
 .composer-target-controls__token-address {
   font-size: 10px;
-  color: var(--text-secondary);
+  color: inherit;
   font-weight: 500;
 }
 
 .composer-target-controls__token-address-btn--copied .composer-target-controls__token-address {
-  color: var(--success);
+  color: inherit;
   font-weight: 600;
 }
 
@@ -477,18 +510,6 @@ useClickOutside(targetAssetDropdownRef, () => {
 }
 
 @media (max-width: 768px) {
-  .composer-target-controls__dropdown-trigger {
-    min-height: 48px;
-    padding: 12px 14px;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .composer-target-controls__dropdown-option {
-    min-height: 48px;
-    padding: 12px 14px;
-    -webkit-tap-highlight-color: transparent;
-  }
-
   .composer-target-controls__checkbox-label {
     min-height: 44px;
     padding: 10px 0;
@@ -497,34 +518,14 @@ useClickOutside(targetAssetDropdownRef, () => {
 }
 
 @media (max-width: 520px) {
-  .composer-target-controls__row {
-    grid-template-columns: 1fr;
+  .composer-target-controls__chain-wrap {
+    flex: 1 1 100%;
   }
 
-  .composer-target-controls__asset-and-batch {
-    flex-direction: column;
-    align-items: stretch;
+  .composer-target-controls__destination-btn--selected {
+    flex: 1 1 100%;
+    max-width: 100%;
   }
-
-  .composer-target-controls__asset-selector {
-    width: 100%;
-  }
-}
-
-.composer-target-controls__asset-row {
-  min-width: 0;
-}
-
-.composer-target-controls__asset-and-batch {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.composer-target-controls__asset-selector {
-  width: 260px;
-  min-width: 0;
 }
 
 .composer-target-controls__checkbox-label {

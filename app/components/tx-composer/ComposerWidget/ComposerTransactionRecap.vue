@@ -17,8 +17,14 @@ const displayedTransactions = computed(() => {
 
 const hasMore = computed(() => props.transactions.length > 5)
 
+/** True if hash looks like an EVM tx hash (0x + 64 hex chars); false for batchId etc. */
+function isExplorableTxHash(hash: string): boolean {
+  return /^0x[0-9a-fA-F]{64}$/.test(hash)
+}
+
 function getExplorerUrl(tx: AppTxRecord): string {
   if (tx.explorerUrl) return tx.explorerUrl
+  if (!isExplorableTxHash(tx.hash)) return ''
 
   const explorerMap: Record<number, string> = {
     1: 'https://etherscan.io',
@@ -76,6 +82,7 @@ function formatTimestamp(timestamp: number): string {
           getChainName(props.latestSuccess.chainId)
         }}</span>
         <a
+          v-if="getExplorerUrl(props.latestSuccess)"
           :href="getExplorerUrl(props.latestSuccess)"
           target="_blank"
           rel="noopener noreferrer"

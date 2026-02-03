@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 import { useConnection } from '@wagmi/vue'
 import { zeroAddress, type Address } from 'viem'
 import { CHAIN_METADATA } from '~/utils/chains'
+import { ETH_ICON_URL } from '~/utils/tokenAddresses'
 import { handleError } from '~/utils/error-handler'
 import { useTxComposer } from '~/composables/useTxComposer'
 import { useBatchComposer } from '~/composables/useBatchComposer'
@@ -11,11 +12,8 @@ import { useComposerAmountDrafts } from '~/composables/useComposerAmountDrafts'
 import { useComposerQuotes } from '~/composables/useComposerQuotes'
 import { useComposerBatchSupport } from '~/composables/useComposerBatchSupport'
 import { useComposerBatchingUi } from '~/composables/useComposerBatchingUi'
-import { useTransactionHistory } from '~/composables/useTransactionHistory'
-import { useWatchedAddress } from '~/composables/useWatchedAddress'
 
 const { address } = useConnection()
-const { watchedAddress } = useWatchedAddress()
 const useBatching = ref(true)
 const showRouteDetails = ref(false)
 const isExecuteUiPending = ref(false)
@@ -75,7 +73,15 @@ const {
   shortenAddress,
   copyAddress,
   getChainIconUrl,
+  gasTokenName,
+  needsTargetTokenSelection,
+  dismissTargetTokenSelectionPrompt,
 } = useComposerTargetState({ allTokens, selectedTokens })
+
+const nativeTokenLogoUrl = computed(() => {
+  if (targetChainId.value === null) return null
+  return gasTokenName.value === 'ETH' ? ETH_ICON_URL : getChainIconUrl(targetChainId.value)
+})
 
 const isSameAsDestination = (t: { chainId: number; address: string }) => {
   if (targetChainId.value === null || !targetTokenAddress.value) return false
@@ -92,19 +98,6 @@ const skippedSameTokenSymbols = computed(() => {
 
 const connectedAddress = computed<string | null>(() => {
   return address.value ? String(address.value) : null
-})
-
-const effectiveAddress = computed<string | null>(() => {
-  if (address.value) {
-    return String(address.value)
-  }
-  return watchedAddress.value
-})
-
-const { latestSuccess, allTransactions } = useTransactionHistory(effectiveAddress)
-
-const showRecap = computed(() => {
-  return !!latestSuccess.value || allTransactions.value.length > 0
 })
 
 useComposerBatchSupport({
@@ -298,10 +291,6 @@ const onExecute = async () => {
   }
 }
 
-const poweredByText = computed(() => {
-  return 'Powered by LiFi (DEX + bridge aggregation)'
-})
-
 const getOutputLogo = (t: { chainId: number; address: string }): string | undefined => {
   const s = quotes.value[tokenKey(t)]
   if (s?.status === 'ok') return s.route.toToken?.logoURI
@@ -321,22 +310,30 @@ const outputTokenLogoUrl = computed(() => {
   const first = selectedTokens.value[0]
   return first ? getOutputLogo(first) : undefined
 })
+
+const ownedTokensForTargetChain = computed(() => {
+  if (targetChainId.value === null) return []
+  return allTokens.value
+    .filter(t => t.chainId === targetChainId.value && t.usdValue > 0)
+    .slice()
+    .sort((a, b) => b.usdValue - a.usdValue)
+    .map(t => ({
+      address: t.address as Address,
+      symbol: t.symbol,
+      name: t.name,
+      decimals: t.decimals,
+      logoURI: t.logoURI,
+      formattedBalance: t.formattedBalance,
+      usdValue: t.usdValue,
+    }))
+})
 </script>
 
 <template>
   <div class="composer-widget">
-    <TxComposerComposerWidgetComposerSummary
-      :selected-count="selectedTokens.length"
-      :total-value-in="totalValueIn"
-      :total-value-out="totalValueOut"
-      :formatted-total-output="formattedTotalOutput"
-      :output-token-symbol="outputTokenSymbol"
-      :output-token-logo-url="outputTokenLogoUrl"
-      :has-out-quotes="hasOutQuotes"
-    />
-
     <div class="composer-widget__controls">
       <TxComposerComposerWidgetComposerTargetControls
+        :show-route-details="showRouteDetails"
         :chains-by-balance="chainsByBalance"
         :chain-balances="chainBalances"
         :selected-target-chain-ids="selectedTargetChainIds"
@@ -361,8 +358,13 @@ const outputTokenLogoUrl = computed(() => {
         :supports-batching="supportsBatching"
         :use-batching="useBatching"
         :batch-method="batchMethod"
+        :owned-tokens="ownedTokensForTargetChain"
+        :native-token-logo-url="nativeTokenLogoUrl"
+        :needs-target-token-selection="needsTargetTokenSelection"
+        :dismiss-target-token-selection-prompt="dismissTargetTokenSelectionPrompt"
         @update:show-target-chain-filter="showTargetChainFilter = $event"
         @update:use-batching="useBatching = $event"
+        @update:show-route-details="showRouteDetails = $event"
       />
 
       <TxComposerComposerWidgetComposerBatchSettings
@@ -383,7 +385,6 @@ const outputTokenLogoUrl = computed(() => {
         :quotes="quotes"
         :quotes-error="quotesError"
         :skipped-same-token-symbols="skippedSameTokenSymbols"
-        :powered-by-text="poweredByText"
         :show-route-details="showRouteDetails"
         :target-chain-id="targetChainId"
         :target-token-address="targetTokenAddress"
@@ -408,10 +409,15 @@ const outputTokenLogoUrl = computed(() => {
         @update:amount-draft="onUpdateAmountDraft"
       />
 
-      <TxComposerComposerWidgetComposerTransactionRecap
-        v-if="showRecap"
-        :latest-success="latestSuccess"
-        :transactions="allTransactions"
+      <TxComposerComposerWidgetComposerSummary
+        v-if="selectedTokens.length > 0"
+        :selected-count="selectedTokens.length"
+        :total-value-in="totalValueIn"
+        :total-value-out="totalValueOut"
+        :formatted-total-output="formattedTotalOutput"
+        :output-token-symbol="outputTokenSymbol"
+        :output-token-logo-url="outputTokenLogoUrl"
+        :has-out-quotes="hasOutQuotes"
       />
 
       <button
@@ -468,7 +474,7 @@ const outputTokenLogoUrl = computed(() => {
 .composer-widget__controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   overflow: visible;

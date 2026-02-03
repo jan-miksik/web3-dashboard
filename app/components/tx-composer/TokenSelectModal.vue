@@ -2,9 +2,15 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { getPublicClient } from '@wagmi/core'
 import { useConfig, type Config } from '@wagmi/vue'
-import { isAddress, parseAbi, type Address } from 'viem'
-import { CHAIN_METADATA, getChainName } from '~/utils/chains'
-import { getCommonTokens } from '~/utils/tokenAddresses'
+import { isAddress, parseAbi, zeroAddress, type Address } from 'viem'
+import { CHAIN_METADATA, getChainName, type ChainMetadata } from '~/utils/chains'
+import { formatUsdValueParts } from '~/utils/format'
+import {
+  getCommonTokens,
+  getGasTokenName,
+  getUSDCAddress,
+  ETH_ICON_URL,
+} from '~/utils/tokenAddresses'
 import { useVerifiedTokenList } from '~/composables/useVerifiedTokenList'
 import type { ResolvedToken } from '~/components/tx-composer/ComposerWidget/types'
 
@@ -14,13 +20,24 @@ const props = withDefaults(
     chainId: number | null
     /** Current selected token address (for checkmark); string for template binding */
     currentTokenAddress: string | null
+    /** Tokens the user owns on this chain (sorted by value in parent). May include formattedBalance, usdValue. */
+    ownedTokens?: Array<ResolvedToken & { formattedBalance?: string; usdValue?: number }>
+    /** Chain order (e.g. by balance) to match other parts of the app */
+    chainsByBalance?: ChainMetadata[]
+    /** Optional: per-chain portfolio value to show in chain picker */
+    chainBalances?: Record<number, number>
   }>(),
-  {}
+  {
+    ownedTokens: () => [],
+    chainsByBalance: () => [],
+    chainBalances: () => ({}),
+  }
 )
 
 const emit = defineEmits<{
   (e: 'select', token: ResolvedToken): void
   (e: 'select-chain', chainId: number | null): void
+  (e: 'select-mode', mode: 'native' | 'usdc'): void
   (e: 'close'): void
 }>()
 
@@ -43,6 +60,8 @@ const ERC20_META_ABI = parseAbi([
 const chainName = computed(() =>
   props.chainId !== null ? getChainName(props.chainId) : 'Select chain'
 )
+
+const chainsForFilter = computed((): ChainMetadata[] => props.chainsByBalance ?? CHAIN_METADATA)
 const selectedChainIds = computed(() =>
   props.chainId !== null ? new Set([props.chainId]) : new Set<number>()
 )
@@ -51,9 +70,11 @@ function isChainSelected(chainId: number) {
 }
 function onToggleChain(chainId: number) {
   emit('select-chain', chainId)
+  showChainFilter.value = false
 }
 function onClearChain() {
   emit('select-chain', null)
+  showChainFilter.value = false
 }
 function setShowChainFilter(value: boolean) {
   showChainFilter.value = value
@@ -64,22 +85,133 @@ const commonTokens = computed(() => {
   return getCommonTokens(props.chainId)
 })
 
+const POPULAR_SYMBOLS = ['USDT', 'WETH', 'DAI', 'WBTC', 'USDC'] as const
+
+const popularTokens = computed((): Array<ResolvedToken & { logoURI?: string }> => {
+  const common = commonTokens.value
+  if (!common.length) return []
+
+  const out: Array<ResolvedToken & { logoURI?: string }> = []
+  const seen = new Set<string>()
+
+  const push = (t: (ResolvedToken & { logoURI?: string }) | undefined) => {
+    if (!t) return
+    const addr = t.address.toLowerCase()
+    if (seen.has(addr)) return
+    seen.add(addr)
+    out.push(t)
+  }
+
+  for (const sym of POPULAR_SYMBOLS) {
+    push(common.find(t => (t.symbol ?? '').toUpperCase() === sym))
+    if (out.length >= 5) break
+  }
+
+  if (out.length < 5) {
+    for (const t of common) {
+      push(t)
+      if (out.length >= 5) break
+    }
+  }
+
+  return out.slice(0, 5)
+})
+
 const { tokens: verifiedTokens, isLoading: isVerifiedListLoading } = useVerifiedTokenList({
   chainId: computed(() => props.chainId),
 })
 
-/** Common tokens first, then verified list tokens (not in common) sorted by symbol so known/popular order is stable. */
+const usdcToken = computed<ResolvedToken | null>(() => {
+  if (props.chainId === null) return null
+  const addr = getUSDCAddress(props.chainId)
+  if (!addr || addr === zeroAddress) return null
+  return {
+    address: addr,
+    symbol: 'USDC',
+    name: 'USD Coin',
+    decimals: 6,
+    logoURI:
+      'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png',
+  }
+})
+
+const nativeToken = computed<ResolvedToken | null>(() => {
+  if (props.chainId === null) return null
+  const symbol = getGasTokenName(props.chainId)
+  const icon = symbol === 'ETH' ? ETH_ICON_URL : undefined
+  return {
+    address: zeroAddress,
+    symbol,
+    name: 'Native',
+    decimals: 18,
+    logoURI: icon,
+  }
+})
+
+/** Map address -> formattedBalance for owned tokens */
+const ownedBalanceByAddress = computed(() => {
+  const map = new Map<string, string>()
+  for (const t of props.ownedTokens ?? []) {
+    if (t.formattedBalance && t.address) {
+      map.set(t.address.toLowerCase(), t.formattedBalance)
+    }
+  }
+  return map
+})
+
+/** Map address -> usdValue for owned tokens */
+const ownedUsdValueByAddress = computed(() => {
+  const map = new Map<string, number>()
+  for (const t of props.ownedTokens ?? []) {
+    const row = t as ResolvedToken & { usdValue?: number }
+    if (t.address != null && typeof row.usdValue === 'number') {
+      map.set(t.address.toLowerCase(), row.usdValue)
+    }
+  }
+  return map
+})
+
+/**
+ * Order tokens for selection.
+ * - Native and USDC at top (when chain selected).
+ * - Then 5 popular tokens.
+ * - Owned tokens next.
+ * - Then popular/common tokens.
+ * - Then verified token list.
+ */
 const listTokens = computed((): Array<ResolvedToken & { logoURI?: string }> => {
+  const owned = (props.ownedTokens ?? []).slice()
   const common = commonTokens.value
   const verified = verifiedTokens.value
-  const commonAddrs = new Set(common.map(t => t.address.toLowerCase()))
+
+  const seen = new Set<string>()
+  const out: Array<ResolvedToken & { logoURI?: string }> = []
+
+  const pushUnique = (t: (ResolvedToken & { logoURI?: string }) | null | undefined) => {
+    if (!t) return
+    const addr = (t.address ?? '').toLowerCase()
+    if (addr && seen.has(addr)) return
+    if (addr) seen.add(addr)
+    out.push(t)
+  }
+
+  if (props.chainId !== null) {
+    pushUnique(nativeToken.value)
+    pushUnique(usdcToken.value)
+  }
+  popularTokens.value.forEach(pushUnique)
+  owned.forEach(pushUnique)
+  common.forEach(pushUnique)
+
   const extra = verified
-    .filter(t => !commonAddrs.has(t.address.toLowerCase()))
+    .filter(t => !seen.has(t.address.toLowerCase()))
     .slice()
     .sort((a, b) =>
       (a.symbol ?? '').localeCompare(b.symbol ?? '', undefined, { sensitivity: 'base' })
     )
-  return [...common, ...extra]
+  extra.forEach(pushUnique)
+
+  return out
 })
 
 const filteredTokens = computed(() => {
@@ -155,6 +287,11 @@ function selectToken(token: ResolvedToken) {
   emit('close')
 }
 
+function selectMode(mode: 'native' | 'usdc') {
+  emit('select-mode', mode)
+  emit('close')
+}
+
 function handleClose() {
   searchQuery.value = ''
   resolvedToken.value = null
@@ -181,6 +318,33 @@ function handleKeydown(e: KeyboardEvent) {
 
 function isSelected(address: string): boolean {
   return props.currentTokenAddress?.toLowerCase() === address.toLowerCase()
+}
+
+function onSelectTokenOrMode(token: ResolvedToken & { logoURI?: string }) {
+  if (token.address === zeroAddress) {
+    selectMode('native')
+    return
+  }
+  if (usdcToken.value && token.address.toLowerCase() === usdcToken.value.address.toLowerCase()) {
+    selectMode('usdc')
+    return
+  }
+  selectToken(token)
+}
+
+function getOwnedBalance(addr: string): string | undefined {
+  return ownedBalanceByAddress.value.get(addr.toLowerCase())
+}
+
+function getOwnedUsdValue(addr: string): number | undefined {
+  return ownedUsdValueByAddress.value.get(addr.toLowerCase())
+}
+
+function getOwnedUsdFormatted(addr: string): string | null {
+  const v = getOwnedUsdValue(addr)
+  if (v == null) return null
+  const parts = formatUsdValueParts(v)
+  return `${parts.main}${parts.extra ?? ''}`
 }
 
 watch(
@@ -228,12 +392,15 @@ watch(
         @keydown="handleKeydown"
       >
         <div class="token-select-modal__backdrop" @click="handleClose" />
-        <div class="token-select-modal__content">
+        <div
+          class="token-select-modal__content"
+          :class="{ 'token-select-modal__content--chain-picker': chainId === null }"
+        >
           <div class="token-select-modal__header">
             <h2 id="token-select-modal-title" class="token-select-modal__title">Select token</h2>
             <div class="token-select-modal__chain">
               <NetworkFilter
-                :chains-with-assets="CHAIN_METADATA"
+                :chains-with-assets="chainsForFilter"
                 :chains-without-assets="[]"
                 :selected-chain-ids="selectedChainIds"
                 :selected-chains-display="chainName"
@@ -241,6 +408,8 @@ watch(
                 :is-chain-selected="isChainSelected"
                 :on-toggle-chain="onToggleChain"
                 :on-click-all-networks="onClearChain"
+                :chain-balances="props.chainBalances"
+                :dropdown-z-index="1100"
                 all-networks-label="Select chain"
                 @update:show-chain-filter="setShowChainFilter($event)"
               />
@@ -294,7 +463,7 @@ watch(
                   }"
                   role="option"
                   :aria-selected="isSelected(token.address)"
-                  @click="selectToken(token)"
+                  @click="onSelectTokenOrMode(token)"
                 >
                   <img
                     v-if="token.logoURI"
@@ -309,6 +478,17 @@ watch(
                   <div class="token-select-modal__item-info">
                     <span class="token-select-modal__symbol">{{ token.symbol }}</span>
                     <span class="token-select-modal__name">{{ token.name }}</span>
+                  </div>
+                  <div class="token-select-modal__item-right">
+                    <span v-if="getOwnedBalance(token.address)" class="token-select-modal__balance">
+                      {{ getOwnedBalance(token.address) }}
+                    </span>
+                    <span
+                      v-if="getOwnedUsdFormatted(token.address)"
+                      class="token-select-modal__usd"
+                    >
+                      {{ getOwnedUsdFormatted(token.address) }}
+                    </span>
                   </div>
                   <span v-if="isSelected(token.address)" class="token-select-modal__check">
                     ✓
@@ -389,7 +569,7 @@ watch(
   position: relative;
   width: 100%;
   max-width: 420px;
-  max-height: 85vh;
+  max-height: 90vh;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -397,6 +577,11 @@ watch(
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.token-select-modal__content--chain-picker {
+  min-height: 420px;
+  overflow: visible;
 }
 
 .token-select-modal__header {
@@ -475,7 +660,7 @@ watch(
   overflow-y: auto;
   padding: 8px;
   min-height: 120px;
-  max-height: 280px;
+  max-height: 420px;
 }
 
 .token-select-modal__item {
@@ -541,6 +726,28 @@ watch(
   text-overflow: ellipsis;
 }
 
+.token-select-modal__item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.token-select-modal__balance {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.token-select-modal__usd {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
 .token-select-modal__check {
   color: var(--success);
   font-weight: 700;
@@ -557,10 +764,14 @@ watch(
 }
 
 .token-select-modal__empty {
-  padding: 24px 20px;
+  padding: 48px 20px;
   font-size: 14px;
   color: var(--text-secondary);
   text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .token-select-modal__unknown-address {

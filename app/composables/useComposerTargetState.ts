@@ -32,8 +32,14 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   const config = useConfig() as unknown as Config
 
   const targetChainId = ref<number | null>(null)
-  const targetAssetMode = ref<TargetAssetMode>('native')
+  // Start with no destination token selected; user must choose.
+  const targetAssetMode = ref<TargetAssetMode>('custom')
   const customTokenAddressInput = ref('')
+  const needsTargetTokenSelection = ref(false)
+
+  const dismissTargetTokenSelectionPrompt = () => {
+    needsTargetTokenSelection.value = false
+  }
 
   // Chain selector UI
   const showTargetChainFilter = ref(false)
@@ -55,7 +61,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     showTargetChainFilter.value = false
   }
 
-  // Auto-set target chain based on first selected token if unset
+  // Auto-set target chain and native token when user selects first token from the left (no destination yet)
   watch(selectedTokens, (newTokens, oldTokens) => {
     if (
       targetChainId.value === null &&
@@ -64,7 +70,71 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
       newTokens[0]
     ) {
       targetChainId.value = newTokens[0].chainId
+      if (targetAssetMode.value === 'custom' && !resolvedCustomToken.value) {
+        targetAssetMode.value = 'native'
+      }
     }
+  })
+
+  // When chain changes, try to keep the same destination asset (by symbol) on the new chain.
+  // If we can't find a match, we clear selection and prompt the user to select a valid token.
+  watch(targetChainId, (newChainId, oldChainId) => {
+    if (newChainId === null || oldChainId === null || newChainId === oldChainId) return
+
+    // Reset prompt; we'll enable it if we can't map the token.
+    needsTargetTokenSelection.value = false
+
+    // Native token always exists.
+    if (targetAssetMode.value === 'native') return
+
+    // USDC is chain-specific.
+    if (targetAssetMode.value === 'usdc') {
+      if (getUSDCAddress(newChainId) === zeroAddress) {
+        targetAssetMode.value = 'custom'
+        resolvedCustomToken.value = null
+        needsTargetTokenSelection.value = true
+      }
+      return
+    }
+
+    if (targetAssetMode.value !== 'custom') return
+    if (!resolvedCustomToken.value) return
+
+    const prevSymbol = (resolvedCustomToken.value.symbol ?? '').toUpperCase()
+
+    // If the "custom" token was actually USDC, keep USDC mode if available.
+    if (prevSymbol === 'USDC' && getUSDCAddress(newChainId) !== zeroAddress) {
+      resolvedCustomToken.value = null
+      targetAssetMode.value = 'usdc'
+      return
+    }
+
+    // If the symbol matches the new chain's gas token, switch to native.
+    const newGasSymbol = getGasTokenName(newChainId).toUpperCase()
+    if (prevSymbol && prevSymbol === newGasSymbol) {
+      resolvedCustomToken.value = null
+      targetAssetMode.value = 'native'
+      return
+    }
+
+    // Try to reselect a well-known token on the new chain (DAI -> DAI, WETH -> WETH, etc.).
+    const common = getCommonTokens(newChainId)
+    const match = common.find(t => (t.symbol ?? '').toUpperCase() === prevSymbol)
+    if (match) {
+      resolvedCustomToken.value = {
+        address: match.address,
+        symbol: match.symbol,
+        name: match.name,
+        decimals: match.decimals,
+        logoURI: match.logoURI,
+      }
+      return
+    }
+
+    // Could not map token to new chain → clear and prompt.
+    resolvedCustomToken.value = null
+    targetAssetMode.value = 'custom'
+    needsTargetTokenSelection.value = true
   })
 
   const chainBalances = computed(() => aggregateUsdByChainId(allTokens.value))
@@ -143,13 +213,13 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   })
 
   const targetTokenLabel = computed(() => {
-    if (targetChainId.value === null) return 'Select target'
+    if (targetChainId.value === null) return 'Select token'
     if (targetAssetMode.value === 'native') return `${gasTokenName.value} (Native)`
     if (targetAssetMode.value === 'usdc') return 'USDC'
     if (resolvedCustomToken.value) {
       return `${resolvedCustomToken.value.symbol} (${resolvedCustomToken.value.name})`
     }
-    return 'Custom token'
+    return 'Select token'
   })
 
   const getChainIconUrl = (chainId: number): string | undefined => getChainIcon(chainId)
@@ -195,6 +265,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   })
 
   const selectTargetAsset = (modeOrAddress: string) => {
+    needsTargetTokenSelection.value = false
     if (modeOrAddress === 'native' || modeOrAddress === 'usdc') {
       targetAssetMode.value = modeOrAddress
       return
@@ -221,6 +292,7 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
   }
 
   const selectCustomToken = (token: ResolvedToken) => {
+    needsTargetTokenSelection.value = false
     targetAssetMode.value = 'custom'
     resolvedCustomToken.value = token
   }
@@ -255,6 +327,8 @@ export function useComposerTargetState(options: UseComposerTargetStateOptions) {
     selectedTargetOptionId,
     selectTargetAsset,
     selectCustomToken,
+    needsTargetTokenSelection,
+    dismissTargetTokenSelectionPrompt,
 
     // misc
     gasTokenName,

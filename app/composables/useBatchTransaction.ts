@@ -4,6 +4,7 @@ import { getPublicClient, getWalletClient } from '@wagmi/core'
 import { encodeFunctionData, type Address, type Hex, type Chain } from 'viem'
 import { sendCalls, getCapabilities } from 'viem/actions'
 import { logger } from '~/utils/logger'
+import { formatWeiAsEth } from '~/utils/format'
 
 // EIP-7702 Authorization type (compatible with viem's SignedAuthorization)
 interface Authorization {
@@ -100,6 +101,7 @@ export interface BatchTransactionResult {
   method: BatchMethod
   txHash?: Hex
   batchId?: string
+  feeSummary?: string
   error?: Error
 }
 
@@ -715,10 +717,16 @@ export function useBatchTransaction() {
 
       status.value = 'Waiting for confirmation...'
 
-      // 4. Wait for receipt
+      // 4. Wait for receipt and compute fee
+      let feeSummary: string | undefined
       const pc = getPublicClient(config, { chainId: chain.id })
       if (pc) {
-        await pc.waitForTransactionReceipt({ hash })
+        const receipt = await pc.waitForTransactionReceipt({ hash })
+        const fee =
+          receipt.gasUsed && receipt.effectiveGasPrice
+            ? receipt.gasUsed * receipt.effectiveGasPrice
+            : 0n
+        feeSummary = formatWeiAsEth(fee)
       }
 
       status.value = 'Batch complete!'
@@ -727,6 +735,7 @@ export function useBatchTransaction() {
         success: true,
         method: 'eip7702',
         txHash: hash,
+        feeSummary,
       }
     } catch (e: any) {
       logger.error('EIP-7702 batch failed', e)
@@ -846,10 +855,17 @@ export function useBatchTransaction() {
 
       status.value = 'Batch submitted!'
 
+      const batchId =
+        typeof result === 'object' && result != null && 'id' in result
+          ? String((result as { id: string }).id)
+          : typeof result === 'string'
+            ? result
+            : ''
+
       return {
         success: true,
         method: 'eip5792',
-        batchId: String(result),
+        batchId: batchId || undefined,
       }
     } catch (e: any) {
       if (e?.message?.includes('user rejected') || e?.code === 4001) {
@@ -882,6 +898,7 @@ export function useBatchTransaction() {
     }
     const pc = getPublicClient(config, { chainId: chain.id })
     const hashes: Hex[] = []
+    let totalFee = 0n
 
     for (let i = 0; i < calls.length; i++) {
       const call = calls[i]!
@@ -898,9 +915,11 @@ export function useBatchTransaction() {
 
       hashes.push(hash)
 
-      // Wait for confirmation before next tx
       if (pc) {
-        await pc.waitForTransactionReceipt({ hash })
+        const receipt = await pc.waitForTransactionReceipt({ hash })
+        if (receipt.gasUsed && receipt.effectiveGasPrice) {
+          totalFee += receipt.gasUsed * receipt.effectiveGasPrice
+        }
       }
     }
 
@@ -910,6 +929,7 @@ export function useBatchTransaction() {
       success: true,
       method: 'sequential',
       txHash: hashes[hashes.length - 1],
+      feeSummary: totalFee > 0n ? formatWeiAsEth(totalFee) : undefined,
     }
   }
 

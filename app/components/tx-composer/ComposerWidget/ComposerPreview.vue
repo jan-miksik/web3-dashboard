@@ -20,7 +20,6 @@ const props = defineProps<{
   quotes: Record<string, QuoteState>
   quotesError: string | null
   skippedSameTokenSymbols: string[]
-  poweredByText: string
   showRouteDetails: boolean
   targetChainId: number | null
   targetTokenAddress: string | null
@@ -103,24 +102,6 @@ function onApplyDefaultPercentToAllSelected() {
 
 <template>
   <div class="composer-preview">
-    <div class="composer-preview__header">
-      <div class="composer-preview__title">Transaction Preview</div>
-      <div class="composer-preview__header-right">
-        <div v-if="props.showRouteDetails" class="composer-preview__subtitle">
-          {{ props.poweredByText }}
-        </div>
-        <label class="composer-preview__details-toggle">
-          <input
-            :checked="props.showRouteDetails"
-            type="checkbox"
-            class="composer-preview__details-toggle-input"
-            @change="emit('update:show-route-details', ($event.target as HTMLInputElement).checked)"
-          />
-          <span>Show details</span>
-        </label>
-      </div>
-    </div>
-
     <div v-if="props.quotesError" class="composer-preview__error-text">{{ props.quotesError }}</div>
 
     <div
@@ -250,6 +231,13 @@ function onApplyDefaultPercentToAllSelected() {
                 <div class="composer-preview__token-topline">
                   <span class="composer-preview__token-symbol">{{ t.symbol }}</span>
                   <div class="composer-preview__inline-amount">
+                    <button
+                      class="composer-preview__inline-max-btn"
+                      type="button"
+                      @click="props.setMaxAmount(t)"
+                    >
+                      MAX
+                    </button>
                     <input
                       :value="props.amountDrafts[props.tokenKey(t)] ?? ''"
                       class="composer-preview__inline-amount-input"
@@ -265,13 +253,6 @@ function onApplyDefaultPercentToAllSelected() {
                       @blur="props.commitAmountDraft(t)"
                       @keydown.enter.prevent="props.commitAmountDraft(t)"
                     />
-                    <button
-                      class="composer-preview__inline-max-btn"
-                      type="button"
-                      @click="props.setMaxAmount(t)"
-                    >
-                      MAX
-                    </button>
                   </div>
                 </div>
                 <div class="composer-preview__token-meta">
@@ -429,64 +410,13 @@ function onApplyDefaultPercentToAllSelected() {
 <style scoped>
 .composer-preview {
   border-top: 1px solid var(--border-color);
-  padding-top: 10px;
+  padding-top: 32px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.composer-preview__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 24px;
-  margin-top: 10px;
-}
-
-.composer-preview__header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.composer-preview__details-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--text-secondary);
-  user-select: none;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.composer-preview__details-toggle:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-light);
-}
-
-.composer-preview__details-toggle-input {
-  margin: 0;
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-}
-
-.composer-preview__title {
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--text-primary);
-}
-
-.composer-preview__subtitle {
-  font-size: 11px;
-  color: var(--text-secondary);
 }
 
 .composer-preview__error-text {
@@ -541,8 +471,8 @@ function onApplyDefaultPercentToAllSelected() {
 }
 
 .composer-preview__header-col {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 16px;
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -817,6 +747,12 @@ function onApplyDefaultPercentToAllSelected() {
   font-weight: 800;
   cursor: pointer;
   flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.composer-preview__card:hover .composer-preview__inline-max-btn {
+  opacity: 1;
 }
 
 .composer-preview__token-meta {
@@ -1002,29 +938,6 @@ function onApplyDefaultPercentToAllSelected() {
 }
 
 @media (max-width: 768px) {
-  .composer-preview__header {
-    flex-wrap: wrap;
-    padding-bottom: 16px;
-    margin-top: 8px;
-  }
-
-  .composer-preview__header-right {
-    width: 100%;
-    order: 3;
-    margin-top: 4px;
-  }
-
-  .composer-preview__details-toggle {
-    min-height: 44px;
-    padding: 10px 12px;
-    font-size: 12px;
-  }
-
-  .composer-preview__details-toggle-input {
-    width: 18px;
-    height: 18px;
-  }
-
   .composer-preview__cancel-btn {
     width: 36px;
     height: 36px;

@@ -1,7 +1,25 @@
-import { computed, ref, watch, type MaybeRef } from 'vue'
+import { computed, reactive, ref, type MaybeRef } from 'vue'
 import { logger } from '~/utils/logger'
 
 export type AppTxStatus = 'submitted' | 'pending' | 'success' | 'failed'
+
+/** Per-token leg of a swap (one source token → output) */
+export type TxHistorySwapLeg = {
+  chainId: number
+  fromToken: {
+    address: string
+    symbol: string
+    name?: string
+    logoURI?: string
+    decimals: number
+  }
+  fromAmount: string // raw amount (wei/smallest unit)
+  fromAmountUsd?: number // USD value at execution
+  toAmount?: string // raw output (may be on different chain)
+  toAmountUsd?: number
+  providers: string[] // e.g. ["Uniswap", "Stargate"]
+  routeType?: string // "lifi" | "swap" | "bridge"
+}
 
 export type AppTxRecord = {
   hash: string
@@ -9,44 +27,68 @@ export type AppTxRecord = {
   status: AppTxStatus
   timestamp: number
   source: 'app'
-  inputSummary?: string
-  outputSummary?: string
+  // Top-level summary (always present)
+  totalSellUsd?: number // sum of all fromAmountUsd
+  totalReceiveUsd?: number // sum of all toAmountUsd
+  totalReceiveAmount?: string // raw amount in output token
+  outputTokenSymbol?: string
   feeSummary?: string
-  batchCount?: number
   explorerUrl?: string
   batchId?: string
+  batchCount?: number
+  // Legacy short summaries (keep for backward compat)
+  inputSummary?: string
+  outputSummary?: string
+  // NEW: expandable detail
+  details?: {
+    legs: TxHistorySwapLeg[]
+    outputToken: {
+      chainId: number
+      address: string
+      symbol: string
+      logoURI?: string
+      decimals?: number
+    }
+  }
 }
 
 const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined'
 
 const storageKeyFor = (address: string) => `web3-dashboard:tx-history:${address.toLowerCase()}`
 
-const memoryStore = new Map<string, AppTxRecord[]>()
+/** Shared reactive store - all useTransactionHistory instances read from here so UI updates when any instance adds a tx */
+const sharedStore = reactive<Record<string, AppTxRecord[]>>({})
 
 export const clearTransactionHistoryCache = () => {
-  memoryStore.clear()
+  for (const key of Object.keys(sharedStore)) delete sharedStore[key]
 }
 
-const readStore = (key: string): AppTxRecord[] => {
-  if (!isBrowser()) return memoryStore.get(key) ?? []
+const loadFromStorage = (key: string): AppTxRecord[] => {
+  if (!isBrowser()) return []
   try {
     const raw = localStorage.getItem(key)
-    if (!raw) return memoryStore.get(key) ?? []
+    if (!raw) return []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as AppTxRecord[]) : []
   } catch {
-    return memoryStore.get(key) ?? []
+    return []
   }
 }
 
-const writeStore = (key: string, records: AppTxRecord[]) => {
-  memoryStore.set(key, records)
+const persistToStorage = (key: string, records: AppTxRecord[]) => {
   if (!isBrowser()) return
   try {
     localStorage.setItem(key, JSON.stringify(records))
   } catch (error) {
     logger.error('Failed to write transaction history to localStorage', error, { key })
   }
+}
+
+const getRecords = (key: string): AppTxRecord[] => {
+  if (!(key in sharedStore)) {
+    sharedStore[key] = loadFromStorage(key)
+  }
+  return sharedStore[key]!
 }
 
 export const isUserRejectedError = (error: unknown): boolean => {
@@ -69,21 +111,16 @@ export function useTransactionHistory(address?: MaybeRef<string | null | undefin
     const addr = currentAddress.value
     return addr ? storageKeyFor(addr) : null
   })
-  const records = ref<AppTxRecord[]>([])
 
-  // Watch for address changes and reload records from storage
-  watch(
-    currentAddress,
-    addr => {
-      records.value = addr ? readStore(storageKeyFor(addr)) : []
-    },
-    { immediate: true, flush: 'sync' }
-  )
-
-  const persist = () => {
+  /** Reads from shared reactive store - UI updates when any instance adds/updates a tx */
+  const records = computed(() => {
     const key = storageKey.value
-    if (!key) return
-    writeStore(key, records.value)
+    if (!key) return []
+    return getRecords(key)
+  })
+
+  const persist = (key: string, records: AppTxRecord[]) => {
+    persistToStorage(key, records)
   }
 
   const addTransaction = (record: AppTxRecord) => {
@@ -92,27 +129,36 @@ export function useTransactionHistory(address?: MaybeRef<string | null | undefin
       logger.warn('addTransaction called with invalid record', { record })
       return
     }
-    const idx = records.value.findIndex(r => r.hash === record.hash && r.chainId === record.chainId)
+    const key = storageKey.value
+    if (!key) return
+    const arr = getRecords(key)
+    const idx = arr.findIndex(r => r.hash === record.hash && r.chainId === record.chainId)
     if (idx >= 0) {
-      records.value[idx] = { ...records.value[idx], ...record }
+      arr[idx] = { ...arr[idx], ...record }
     } else {
-      records.value = [record, ...records.value]
+      arr.unshift(record)
     }
-    persist()
+    persist(key, arr)
   }
 
   const updateTransaction = (hash: string, chainId: number, patch: Partial<AppTxRecord>) => {
-    const idx = records.value.findIndex(r => r.hash === hash && r.chainId === chainId)
+    const key = storageKey.value
+    if (!key) return
+    const arr = getRecords(key)
+    const idx = arr.findIndex(r => r.hash === hash && r.chainId === chainId)
     if (idx >= 0) {
-      const existing = records.value[idx]
-      records.value[idx] = { ...existing, ...patch } as AppTxRecord
+      arr[idx] = { ...arr[idx], ...patch } as AppTxRecord
     } else {
-      records.value = [
-        { hash, chainId, source: 'app', status: 'pending', timestamp: Date.now(), ...patch },
-        ...records.value,
-      ]
+      arr.unshift({
+        hash,
+        chainId,
+        source: 'app',
+        status: 'pending',
+        timestamp: Date.now(),
+        ...patch,
+      })
     }
-    persist()
+    persist(key, arr)
   }
 
   const shouldStoreFailure = (error: unknown) => !isUserRejectedError(error)

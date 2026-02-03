@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
+import { useConnection } from '@wagmi/vue'
 import { clearBatchCapabilitiesCache } from '~/composables/useBatchTransaction'
 import { useTxComposer, clearQuoteCache } from '~/composables/useTxComposer'
+import { useTransactionHistory } from '~/composables/useTransactionHistory'
+import { useWatchedAddress } from '~/composables/useWatchedAddress'
 import {
   CHAIN_METADATA,
   getChainName,
@@ -10,6 +13,16 @@ import {
 } from '~/utils/chains'
 
 useHead({ title: 'Swap into One | Web3 Dashboard' })
+
+const { address } = useConnection()
+const { watchedAddress } = useWatchedAddress()
+const effectiveAddress = computed<string | null>(() => {
+  if (address.value) return String(address.value)
+  return watchedAddress.value
+})
+const { allTransactions } = useTransactionHistory(effectiveAddress)
+const showTransactionHistory = computed(() => allTransactions.value.length > 0)
+const showHistoryOpen = ref(false)
 
 const {
   allTokens,
@@ -238,11 +251,52 @@ onUnmounted(() => {
       </div>
       <div class="swap-into-one-page__right-col">
         <TxComposerComposerWidget />
+        <section
+          v-if="showTransactionHistory"
+          class="swap-into-one-page__history-box"
+          aria-labelledby="tx-history-heading"
+        >
+          <div class="swap-into-one-page__history-box-header">
+            <h2 id="tx-history-heading" class="swap-into-one-page__history-box-title">
+              Transaction History
+            </h2>
+            <button
+              type="button"
+              class="swap-into-one-page__history-toggle"
+              :aria-expanded="showHistoryOpen"
+              aria-controls="tx-history-list"
+              @click="showHistoryOpen = !showHistoryOpen"
+            >
+              <span>{{ showHistoryOpen ? 'Hide' : 'Show' }} transaction history</span>
+              <svg
+                class="swap-into-one-page__history-toggle-icon"
+                :class="{ 'swap-into-one-page__history-toggle-icon--open': showHistoryOpen }"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
+          <Transition name="history-slide">
+            <div
+              v-show="showHistoryOpen"
+              id="tx-history-list"
+              class="swap-into-one-page__history-list"
+              role="region"
+            >
+              <TransactionHistoryBox :transactions="allTransactions" no-heading />
+            </div>
+          </Transition>
+        </section>
       </div>
     </div>
   </div>
 </template>
-
 <style scoped>
 .swap-into-one-page {
   max-width: 1400px;
@@ -519,6 +573,105 @@ onUnmounted(() => {
 
 .swap-into-one-page__right-col {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  position: sticky;
+  top: 0px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+/* Same big box as Transaction preview (composer widget) */
+.swap-into-one-page__history-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.swap-into-one-page__history-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.swap-into-one-page__history-box-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.swap-into-one-page__history-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swap-into-one-page__history-toggle:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.swap-into-one-page__history-toggle-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.swap-into-one-page__history-toggle-icon--open {
+  transform: rotate(180deg);
+}
+
+.swap-into-one-page__history-list {
+  margin-top: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: min(60vh, 480px);
+}
+
+.swap-into-one-page__history-list .transaction-history-box {
+  padding: 0;
+}
+
+.history-slide-enter-active,
+.history-slide-leave-active {
+  transition:
+    max-height 0.25s ease-out,
+    opacity 0.2s ease-out;
+  overflow: hidden;
+}
+
+.history-slide-enter-from,
+.history-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+.history-slide-enter-to,
+.history-slide-leave-from {
+  max-height: min(60vh, 480px);
+  opacity: 1;
+  margin-top: 16px;
 }
 
 @media (max-width: 900px) {
@@ -529,6 +682,21 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .swap-into-one-page__right-col {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+
+  .swap-into-one-page__history-box {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .swap-into-one-page__history-list {
+    max-height: 400px;
+  }
+
   .swap-into-one-page {
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);

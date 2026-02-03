@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { ChainMetadata } from '~/utils/chains'
 import { formatUsdValueParts } from '~/utils/format'
-import { useClickOutside } from '~/composables/useClickOutside'
 
 interface Props {
   chainsWithAssets: ChainMetadata[]
@@ -15,22 +14,62 @@ interface Props {
   onClickAllNetworks: () => void
   allNetworksLabel?: string
   chainBalances?: Record<number, number>
+  /** When inside a modal, pass a higher z-index (e.g. 1100) so the dropdown appears above the modal */
+  dropdownZIndex?: number
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const chainFilterRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
+const dropdownStyle = ref<{ top: string; right: string; zIndex?: string }>({ top: '0', right: '0' })
 
 const emit = defineEmits<{
   'update:showChainFilter': [value: boolean]
 }>()
 
-useClickOutside(chainFilterRef, () => {
+function updateDropdownPosition() {
+  if (!chainFilterRef.value || !props.showChainFilter) return
+  nextTick(() => {
+    const rect = chainFilterRef.value!.getBoundingClientRect()
+    const style: { top: string; right: string; zIndex?: string } = {
+      top: `${rect.bottom + 8}px`,
+      right: `${window.innerWidth - rect.right}px`,
+    }
+    if (props.dropdownZIndex != null) {
+      style.zIndex = String(props.dropdownZIndex)
+    }
+    dropdownStyle.value = style
+  })
+}
+
+watch(
+  () => props.showChainFilter,
+  open => {
+    if (open) updateDropdownPosition()
+  }
+)
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as Node
+  if (chainFilterRef.value?.contains(target) || dropdownRef.value?.contains(target)) return
   emit('update:showChainFilter', false)
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('click', handleClickOutside)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('click', handleClickOutside)
+  }
 })
 
 const formatBalance = (val: number | undefined) => {
-  if (val === undefined || val === 0) return ''
+  if (val === undefined) return ''
   const parts = formatUsdValueParts(val)
   return `${parts.main}${parts.extra || ''}`
 }
@@ -66,71 +105,78 @@ const formatBalance = (val: number | undefined) => {
       </div>
       <span class="filter-arrow" :class="{ rotated: showChainFilter }">▼</span>
     </button>
-    <Transition name="dropdown">
-      <div
-        v-if="showChainFilter"
-        class="network-filter-dropdown"
-        data-testid="network-filter-dropdown"
-      >
-        <button
-          class="filter-option"
-          :class="{ selected: selectedChainIds.size === 0 }"
-          @click="onClickAllNetworks"
+    <Teleport to="body">
+      <Transition name="dropdown">
+        <div
+          v-if="showChainFilter"
+          ref="dropdownRef"
+          class="network-filter-dropdown network-filter-dropdown--fixed"
+          data-testid="network-filter-dropdown"
+          :style="dropdownStyle"
         >
-          <span class="option-name">{{ allNetworksLabel ?? 'All Networks' }}</span>
-          <span v-if="selectedChainIds.size === 0" class="checkmark">✓</span>
-        </button>
-        <!-- Chains with assets -->
-        <button
-          v-for="chain in chainsWithAssets"
-          :key="chain.id"
-          class="filter-option"
-          data-testid="network-filter-option"
-          :class="{ selected: isChainSelected(chain.id) }"
-          @click="onToggleChain(chain.id)"
-        >
-          <div class="option-left">
-            <img
-              v-if="chain.icon"
-              :src="chain.icon"
-              :alt="chain.name"
-              class="chain-icon"
-              @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
-            />
-            <span class="option-name">{{ chain.name }}</span>
-          </div>
-          <div class="option-right">
-            <span v-if="chainBalances?.[chain.id]" class="chain-balance">
-              {{ formatBalance(chainBalances[chain.id]) }}
-            </span>
-            <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
-          </div>
-        </button>
-        <!-- Chains without assets (with lower opacity) -->
-        <button
-          v-for="chain in chainsWithoutAssets"
-          :key="chain.id"
-          class="filter-option filter-option-no-assets"
-          data-testid="network-filter-option"
-          :class="{ selected: isChainSelected(chain.id) }"
-          @click="onToggleChain(chain.id)"
-        >
-          <div class="option-left">
-            <img
-              v-if="chain.icon"
-              :src="chain.icon"
-              :alt="chain.name"
-              class="chain-icon"
-              @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
-            />
-            <span class="option-name">{{ chain.name }}</span>
-          </div>
-          <div class="option-right">
-            <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
-          </div>
-        </button>
-      </div>
-    </Transition>
+          <button
+            class="filter-option"
+            :class="{ selected: selectedChainIds.size === 0 }"
+            @click="onClickAllNetworks"
+          >
+            <span class="option-name">{{ allNetworksLabel ?? 'All Networks' }}</span>
+            <span v-if="selectedChainIds.size === 0" class="checkmark">✓</span>
+          </button>
+          <!-- Chains with assets -->
+          <button
+            v-for="chain in chainsWithAssets"
+            :key="chain.id"
+            class="filter-option"
+            data-testid="network-filter-option"
+            :class="{ selected: isChainSelected(chain.id) }"
+            @click="onToggleChain(chain.id)"
+          >
+            <div class="option-left">
+              <img
+                v-if="chain.icon"
+                :src="chain.icon"
+                :alt="chain.name"
+                class="chain-icon"
+                @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+              />
+              <span class="option-name">{{ chain.name }}</span>
+            </div>
+            <div class="option-right">
+              <span v-if="chainBalances?.[chain.id] != null" class="chain-balance">
+                {{ formatBalance(chainBalances[chain.id]) }}
+              </span>
+              <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
+            </div>
+          </button>
+          <!-- Chains without assets (with lower opacity) -->
+          <button
+            v-for="chain in chainsWithoutAssets"
+            :key="chain.id"
+            class="filter-option filter-option-no-assets"
+            data-testid="network-filter-option"
+            :class="{ selected: isChainSelected(chain.id) }"
+            @click="onToggleChain(chain.id)"
+          >
+            <div class="option-left">
+              <img
+                v-if="chain.icon"
+                :src="chain.icon"
+                :alt="chain.name"
+                class="chain-icon"
+                @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+              />
+              <span class="option-name">{{ chain.name }}</span>
+            </div>
+            <div class="option-right">
+              <span v-if="chainBalances?.[chain.id] != null" class="chain-balance">
+                {{ formatBalance(chainBalances[chain.id]) }}
+              </span>
+              <span v-if="isChainSelected(chain.id)" class="checkmark">✓</span>
+            </div>
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -161,8 +207,9 @@ const formatBalance = (val: number | undefined) => {
 }
 
 .network-filter-btn.active {
-  border-color: var(--accent-primary);
-  background: var(--accent-muted);
+  /* Keep "active" subtle — this is a secondary control. */
+  border-color: var(--border-light);
+  background: var(--bg-tertiary);
 }
 
 .filter-content {
@@ -202,9 +249,6 @@ const formatBalance = (val: number | undefined) => {
 }
 
 .network-filter-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -217,6 +261,10 @@ const formatBalance = (val: number | undefined) => {
   padding: 4px;
   min-width: 220px;
   -webkit-overflow-scrolling: touch;
+}
+
+.network-filter-dropdown--fixed {
+  position: fixed;
 }
 
 @media (min-width: 1024px) {

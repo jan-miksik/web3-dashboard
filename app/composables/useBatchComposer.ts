@@ -2,11 +2,12 @@ import { computed } from 'vue'
 import { useConnectorClient, useConnection, useConfig, useSwitchChain } from '@wagmi/vue'
 import { getPublicClient } from '@wagmi/core'
 import { encodeFunctionData, type Address, type Hex, zeroAddress, parseAbi } from 'viem'
+import { formatWeiAsEth } from '~/utils/format'
 import { type Route, getStepTransaction } from '@lifi/sdk'
 import type { Token } from './useTokens'
 import { useTxComposer } from './useTxComposer'
 import { useBatchTransaction, type BatchCall } from './useBatchTransaction'
-import { useTransactionHistory } from './useTransactionHistory'
+import { useTransactionHistory, type TxHistorySwapLeg } from './useTransactionHistory'
 import { logger } from '~/utils/logger'
 
 const ERC20_APPROVE_SELECTOR = '0x095ea7b3'
@@ -53,7 +54,22 @@ export function useBatchComposer() {
   const { address } = useConnection()
   const config = useConfig()
   const { switchChain } = useSwitchChain()
-  const { addTransaction, shouldStoreFailure } = useTransactionHistory(address)
+  const { addTransaction, updateTransaction, shouldStoreFailure } = useTransactionHistory(address)
+
+  /** Fetch on-chain fee for a tx and update the history record (fire-and-forget). */
+  function fetchFeeAndUpdate(txHash: string, chainId: number) {
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return
+    const pc = getPublicClient(config, { chainId })
+    if (!pc) return
+    pc.getTransactionReceipt({ hash: txHash as Hex })
+      .then(receipt => {
+        if (!receipt?.gasUsed || !receipt?.effectiveGasPrice) return
+        const fee = receipt.gasUsed * receipt.effectiveGasPrice
+        const feeSummary = formatWeiAsEth(fee)
+        updateTransaction(txHash, chainId, { feeSummary })
+      })
+      .catch(() => {})
+  }
 
   const {
     detectCapabilities,
@@ -209,27 +225,106 @@ export function useBatchComposer() {
   }
 
   /**
-   * Creates input summary string from tokens and target info
+   * Creates input summary: which tokens were swapped (e.g. "ETH, USDC → USDC")
    */
   const createInputSummary = (
     tokens: Token[],
-    targetChainId: number,
-    targetTokenAddress: Address
+    _targetChainId: number,
+    _targetTokenAddress: Address,
+    routes: Route[]
   ): string => {
-    const tokenCount = tokens.length
-    if (tokenCount === 0) return 'No tokens'
-    if (tokenCount === 1) {
-      const token = tokens[0]!
-      return `Swap ${token.symbol || 'token'} on chain ${token.chainId}`
+    if (tokens.length === 0) return 'No tokens'
+    const inputSymbols = [...new Set(tokens.map(t => t.symbol || 'token'))]
+    const toToken = routes[0]?.toToken as { symbol?: string } | undefined
+    const outputSymbol = toToken?.symbol ?? 'token'
+    if (inputSymbols.length === 1) {
+      return `Swap ${inputSymbols[0]} → ${outputSymbol}`
     }
-    return `Swap ${tokenCount} tokens → chain ${targetChainId}`
+    return `Swap ${inputSymbols.join(', ')} → ${outputSymbol}`
   }
 
   /**
-   * Creates output summary string from target info
+   * Creates output summary: what was received (e.g. "USDC on Base")
    */
-  const createOutputSummary = (targetChainId: number, targetTokenAddress: Address): string => {
-    return `Receive on chain ${targetChainId}`
+  const createOutputSummary = (
+    targetChainId: number,
+    _targetTokenAddress: Address,
+    routes: Route[]
+  ): string => {
+    const toToken = routes[0]?.toToken as { symbol?: string } | undefined
+    const symbol = toToken?.symbol ?? 'token'
+    const chainName =
+      config.chains.find(c => c.id === targetChainId)?.name ?? `chain ${targetChainId}`
+    return `Receive ${symbol} on ${chainName}`
+  }
+
+  /**
+   * Builds detailed swap leg data from tokens and routes for transaction history
+   * Routes are matched to tokens by fromToken address and chainId
+   */
+  const buildSwapLegs = (tokens: Token[], routes: Route[]): TxHistorySwapLeg[] => {
+    const legs: TxHistorySwapLeg[] = []
+
+    // Create a map of routes by fromToken address for quick lookup
+    const routeMap = new Map<string, Route>()
+    for (const route of routes) {
+      const fromToken = route.fromToken as { address?: string } | undefined
+      if (fromToken?.address) {
+        const key = `${route.fromChainId}-${fromToken.address.toLowerCase()}`
+        routeMap.set(key, route)
+      }
+    }
+
+    for (const token of tokens) {
+      const routeKey = `${token.chainId}-${token.address.toLowerCase()}`
+      const route = routeMap.get(routeKey)
+      if (!route) continue
+
+      const action = route.steps[0]?.action as
+        | { fromAmount?: string; toAmount?: string }
+        | undefined
+
+      // Extract providers from route steps - always include LIFI as the aggregator
+      const providers = route.steps
+        .map(step => step.toolDetails?.name)
+        .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
+      const uniqueProviders = ['LIFI', ...new Set(providers)]
+
+      // Get USD values - prefer route's USD values, fallback to token's usdValue
+      const fromAmountUsdRaw = route.fromAmountUSD ?? token.usdValue
+      const fromAmountUsd =
+        typeof fromAmountUsdRaw === 'number'
+          ? fromAmountUsdRaw
+          : typeof fromAmountUsdRaw === 'string'
+            ? Number.parseFloat(fromAmountUsdRaw) || undefined
+            : undefined
+      const toAmountUsdRaw = route.toAmountUSD
+      const toAmountUsd =
+        typeof toAmountUsdRaw === 'number'
+          ? toAmountUsdRaw
+          : typeof toAmountUsdRaw === 'string'
+            ? Number.parseFloat(toAmountUsdRaw) || undefined
+            : undefined
+
+      legs.push({
+        chainId: token.chainId,
+        fromToken: {
+          address: token.address,
+          symbol: token.symbol,
+          name: token.name,
+          logoURI: token.logoURI,
+          decimals: token.decimals,
+        },
+        fromAmount: action?.fromAmount ?? route.fromAmount ?? '0',
+        fromAmountUsd,
+        toAmount: action?.toAmount ?? route.toAmount,
+        toAmountUsd,
+        providers: uniqueProviders,
+        routeType: route.steps[0]?.type ?? 'lifi',
+      })
+    }
+
+    return legs
   }
 
   const executeComposer = async (args: {
@@ -336,45 +431,81 @@ export function useBatchComposer() {
             results.push(result)
 
             // Record successful transaction in history
-            if (result.success && result.txHash) {
+            const txHash = result.txHash ? String(result.txHash) : null
+            const batchId = result.batchId ? String(result.batchId) : null
+            if (result.success && (txHash || batchId)) {
               const inputSummary = createInputSummary(
                 args.tokens,
                 args.targetChainId,
-                args.targetTokenAddress
+                args.targetTokenAddress,
+                routesOnChain
               )
-              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
+              const outputSummary = createOutputSummary(
+                args.targetChainId,
+                args.targetTokenAddress,
+                routesOnChain
+              )
+
+              // Build detailed swap legs
+              const legs = buildSwapLegs(args.tokens, routesOnChain)
+
+              // Calculate totals
+              const totalSellUsd = legs.reduce((sum, leg) => sum + (leg.fromAmountUsd ?? 0), 0)
+              const totalReceiveUsd = legs.reduce((sum, leg) => sum + (leg.toAmountUsd ?? 0), 0)
+              const toToken = routesOnChain[0]?.toToken as
+                | { symbol?: string; address?: string; logoURI?: string; decimals?: number }
+                | undefined
+
+              // Build explorer URL
+              const explorerMap: Record<number, string> = {
+                1: 'https://etherscan.io',
+                8453: 'https://basescan.org',
+                42161: 'https://arbiscan.io',
+                10: 'https://optimistic.etherscan.io',
+                137: 'https://polygonscan.com',
+                43114: 'https://snowtrace.io',
+                250: 'https://ftmscan.com',
+                42220: 'https://celoscan.io',
+                100: 'https://gnosisscan.io',
+                324: 'https://explorer.zksync.io',
+              }
+              const explorerBase =
+                explorerMap[fromChainId] || `https://explorer.chain${fromChainId}.io`
+              const explorerUrl =
+                txHash && /^0x[0-9a-fA-F]{64}$/.test(txHash)
+                  ? `${explorerBase}/tx/${txHash}`
+                  : undefined
 
               addTransaction({
-                hash: result.txHash,
+                hash: txHash ?? batchId ?? '',
                 chainId: fromChainId,
                 status: 'success',
                 timestamp: Date.now(),
                 source: 'app',
                 inputSummary,
                 outputSummary,
+                totalSellUsd,
+                totalReceiveUsd,
+                totalReceiveAmount: routesOnChain[0]?.toAmount,
+                outputTokenSymbol: toToken?.symbol,
+                feeSummary: result.feeSummary,
+                explorerUrl,
                 batchCount: totalBatches,
+                batchId: batchId ?? undefined,
+                details: {
+                  legs,
+                  outputToken: {
+                    chainId: args.targetChainId,
+                    address: args.targetTokenAddress,
+                    symbol: toToken?.symbol ?? 'token',
+                    logoURI: toToken?.logoURI,
+                    decimals: toToken?.decimals,
+                  },
+                },
               })
-            } else if (result.success && result.batchId) {
-              // EIP-5792 returns batchId instead of txHash
-              // Store with batchId for tracking
-              const inputSummary = createInputSummary(
-                args.tokens,
-                args.targetChainId,
-                args.targetTokenAddress
-              )
-              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
-
-              addTransaction({
-                hash: result.batchId, // Use batchId as hash for EIP-5792
-                chainId: fromChainId,
-                status: 'success',
-                timestamp: Date.now(),
-                source: 'app',
-                inputSummary,
-                outputSummary,
-                batchCount: totalBatches,
-                batchId: result.batchId,
-              })
+              if (txHash && /^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+                fetchFeeAndUpdate(txHash, fromChainId)
+              }
             }
 
             // Brief pause between batches to avoid overwhelming the wallet
@@ -388,7 +519,8 @@ export function useBatchComposer() {
               const inputSummary = createInputSummary(
                 args.tokens,
                 args.targetChainId,
-                args.targetTokenAddress
+                args.targetTokenAddress,
+                routesOnChain
               )
               addTransaction({
                 hash: `failed-${Date.now()}-${batchIndex}`, // Generate a unique hash for failed transactions
@@ -416,19 +548,69 @@ export function useBatchComposer() {
               const inputSummary = createInputSummary(
                 args.tokens,
                 args.targetChainId,
-                args.targetTokenAddress
+                args.targetTokenAddress,
+                routesOnChain
               )
-              const outputSummary = createOutputSummary(args.targetChainId, args.targetTokenAddress)
+              const outputSummary = createOutputSummary(
+                args.targetChainId,
+                args.targetTokenAddress,
+                routesOnChain
+              )
+
+              // Build detailed swap legs
+              const legs = buildSwapLegs(args.tokens, routesOnChain)
+
+              // Calculate totals
+              const totalSellUsd = legs.reduce((sum, leg) => sum + (leg.fromAmountUsd ?? 0), 0)
+              const totalReceiveUsd = legs.reduce((sum, leg) => sum + (leg.toAmountUsd ?? 0), 0)
+              const toToken = routesOnChain[0]?.toToken as
+                | { symbol?: string; address?: string; logoURI?: string; decimals?: number }
+                | undefined
+
+              // Build explorer URL
+              const explorerMap: Record<number, string> = {
+                1: 'https://etherscan.io',
+                8453: 'https://basescan.org',
+                42161: 'https://arbiscan.io',
+                10: 'https://optimistic.etherscan.io',
+                137: 'https://polygonscan.com',
+                43114: 'https://snowtrace.io',
+                250: 'https://ftmscan.com',
+                42220: 'https://celoscan.io',
+                100: 'https://gnosisscan.io',
+                324: 'https://explorer.zksync.io',
+              }
+              const explorerBase =
+                explorerMap[fromChainId] || `https://explorer.chain${fromChainId}.io`
+              const explorerUrl = /^0x[0-9a-fA-F]{64}$/.test(String(routeResult.hash))
+                ? `${explorerBase}/tx/${routeResult.hash}`
+                : undefined
 
               addTransaction({
-                hash: routeResult.hash,
+                hash: String(routeResult.hash),
                 chainId: fromChainId,
                 status: 'success',
                 timestamp: Date.now(),
                 source: 'app',
                 inputSummary,
                 outputSummary,
+                totalSellUsd,
+                totalReceiveUsd,
+                totalReceiveAmount: routesOnChain[0]?.toAmount,
+                outputTokenSymbol: toToken?.symbol,
+                explorerUrl,
+                details: {
+                  legs,
+                  outputToken: {
+                    chainId: args.targetChainId,
+                    address: args.targetTokenAddress,
+                    symbol: toToken?.symbol ?? 'token',
+                    logoURI: toToken?.logoURI,
+                    decimals: toToken?.decimals,
+                  },
+                },
               })
+              fetchFeeAndUpdate(String(routeResult.hash), fromChainId)
             }
           } catch (error) {
             // Only store failure if it's not a user rejection
@@ -436,7 +618,8 @@ export function useBatchComposer() {
               const inputSummary = createInputSummary(
                 args.tokens,
                 args.targetChainId,
-                args.targetTokenAddress
+                args.targetTokenAddress,
+                routesOnChain
               )
               addTransaction({
                 hash: `failed-${Date.now()}-${i}`,

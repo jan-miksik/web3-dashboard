@@ -23,18 +23,18 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
         <label class="composer-summary__label">Selected</label>
         <span class="composer-summary__value">{{ props.selectedCount }}</span>
       </div>
-      <div class="composer-summary__stat">
-        <label class="composer-summary__label">Total Sell</label>
-        <div class="composer-summary__value">
-          <span>{{ totalValueInParts.main }}</span>
+      <div class="composer-summary__stat composer-summary__stat--row">
+        <label class="composer-summary__label">Total Sent</label>
+        <div class="composer-summary__value composer-summary__value--row">
+          <span class="composer-summary__usd-value">{{ totalValueInParts.main }}</span>
           <span v-if="totalValueInParts.extra" class="composer-summary__usd-sub-decimals">
             {{ totalValueInParts.extra }}
           </span>
         </div>
       </div>
-      <div class="composer-summary__stat">
+      <div class="composer-summary__stat composer-summary__stat--row">
         <label class="composer-summary__label">Total Receive</label>
-        <div class="composer-summary__value">
+        <div class="composer-summary__value composer-summary__value--row">
           <span>{{ props.formattedTotalOutput }}</span>
           <img
             v-if="props.outputTokenLogoUrl"
@@ -61,6 +61,7 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
 .composer-summary {
   margin-bottom: 12px;
   padding-bottom: 12px;
+  margin-top: 24px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -108,6 +109,10 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
   font-weight: 600;
 }
 
+.composer-summary__usd-value {
+  color: mediumseagreen;
+}
+
 .composer-summary__usd-value-inline {
   font-size: 16px;
   color: mediumseagreen;
@@ -120,5 +125,16 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
   color: var(--text-muted);
   opacity: 0.85;
   font-weight: 600;
+}
+
+.composer-summary__stat--row .composer-summary__value {
+  flex-wrap: wrap;
+}
+
+.composer-summary__value--row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 </style>

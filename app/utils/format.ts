@@ -57,3 +57,14 @@ export function formatUsdValueString(value: number): string {
   const { main, extra } = formatUsdValueParts(value)
   return `${main}${extra ?? ''}`
 }
+
+/**
+ * Format wei as ETH for display (e.g. "0.0012 ETH").
+ */
+export function formatWeiAsEth(wei: bigint): string {
+  if (typeof wei !== 'bigint' || wei <= 0n) return '0 ETH'
+  const eth = Number(wei) / 1e18
+  if (eth >= 1) return `${eth.toFixed(4)} ETH`
+  if (eth >= 0.0001) return `${eth.toFixed(6)} ETH`
+  return `${eth.toExponential(2)} ETH`
+}

@@ -3,6 +3,7 @@ import {
   shortenAddress,
   formatUsdValueParts,
   formatUsdValueString,
+  formatWeiAsEth,
 } from '../../../app/utils/format'
 
 /**
@@ -58,6 +59,19 @@ describe('format', () => {
     it('handles sub-micro values (all-zero decimals branch)', () => {
       const r = formatUsdValueParts(0.0000001)
       expect(r.main).toMatch(/\$0\.00/)
+    })
+  })
+
+  describe('formatWeiAsEth', () => {
+    it('formats wei as ETH', () => {
+      expect(formatWeiAsEth(1_000_000_000_000_000_000n)).toBe('1.0000 ETH')
+      expect(formatWeiAsEth(500_000_000_000_000n)).toBe('0.000500 ETH')
+      expect(formatWeiAsEth(123_456_789_000_000_000n)).toBe('0.123457 ETH')
+    })
+
+    it('returns 0 ETH for zero or negative', () => {
+      expect(formatWeiAsEth(0n)).toBe('0 ETH')
+      expect(formatWeiAsEth(-1n)).toBe('0 ETH')
     })
   })
 
