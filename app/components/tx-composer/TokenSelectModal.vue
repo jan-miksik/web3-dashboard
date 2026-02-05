@@ -744,7 +744,7 @@ watch(
 .token-select-modal__usd {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--usd-value-color);
   font-family: var(--font-mono);
 }
 

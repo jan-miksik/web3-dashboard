@@ -123,11 +123,11 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
     </td>
     <td class="td-value">
       <div class="value-container">
-        <span class="token-value usd-value" :class="{ 'has-value': token.usdValue > 0 }">
+        <span class="balance-value">{{ onFormatBalance(token.formattedBalance) }}</span>
+        <span class="token-value usd-value">
           {{ usdDisplay.main }}
           <span v-if="usdDisplay.extra" class="usd-sub-decimals">{{ usdDisplay.extra }}</span>
         </span>
-        <span class="balance-value">{{ onFormatBalance(token.formattedBalance) }}</span>
       </div>
     </td>
   </tr>
@@ -349,33 +349,29 @@ const usdDisplay = computed(() => props.onFormatUsdValueExpanded(props.token.usd
   letter-spacing: 0.3px;
 }
 
+.balance-value {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
 .usd-value {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
-  font-weight: 700;
+  font-weight: 500;
   font-family: var(--font-mono);
-  color: var(--text-secondary);
-  font-size: 16px;
+  color: var(--usd-value-color);
+  font-size: 12px;
   line-height: 1.2;
-}
-
-.usd-value.has-value {
-  color: var(--success);
 }
 
 .usd-sub-decimals {
-  color: var(--text-muted);
-  opacity: 0.8;
+  color: var(--usd-value-color);
+  opacity: 0.85;
   font-size: 0.9em;
-}
-
-.balance-value {
-  font-weight: 500;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.2;
 }
 
 @media (max-width: 640px) {

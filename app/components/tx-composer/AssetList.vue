@@ -96,7 +96,7 @@ const { copy: copyTokenAddress, copiedValue: copiedAddress } = useCopyToClipboar
               </div>
             </div>
 
-            <div class="token-value">
+            <div class="token-value asset-list__usd">
               <span>{{ formatUsdValueParts(token.usdValue).main }}</span>
               <span v-if="formatUsdValueParts(token.usdValue).extra" class="usd-sub-decimals">
                 {{ formatUsdValueParts(token.usdValue).extra }}
@@ -408,22 +408,25 @@ const { copy: copyTokenAddress, copiedValue: copiedAddress } = useCopyToClipboar
 }
 
 .token-balance {
-  font-size: 10px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
 }
 
-.token-value {
+.token-value.asset-list__usd {
   display: flex;
   align-items: baseline;
   gap: 2px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--usd-value-color);
   margin-bottom: 8px;
+  font-family: var(--font-mono);
 }
 
-.usd-sub-decimals {
-  color: var(--text-muted);
+.asset-list__usd .usd-sub-decimals {
+  color: var(--usd-value-color);
   opacity: 0.85;
   font-size: 0.9em;
 }

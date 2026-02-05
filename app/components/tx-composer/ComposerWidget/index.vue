@@ -331,41 +331,66 @@ const ownedTokensForTargetChain = computed(() => {
 
 <template>
   <div class="composer-widget">
-    <div class="composer-widget__controls">
-      <TxComposerComposerWidgetComposerTargetControls
-        :show-route-details="showRouteDetails"
-        :chains-by-balance="chainsByBalance"
-        :chain-balances="chainBalances"
-        :selected-target-chain-ids="selectedTargetChainIds"
-        :selected-target-chain-display="selectedTargetChainDisplay"
-        :show-target-chain-filter="showTargetChainFilter"
-        :is-target-chain-selected="isTargetChainSelected"
-        :on-toggle-target-chain="onToggleTargetChain"
-        :on-clear-target-chain="onClearTargetChain"
-        :target-chain-id="targetChainId"
-        :target-asset-mode="targetAssetMode"
-        :target-asset-options="targetAssetOptions"
-        :selected-target-option-id="selectedTargetOptionId"
-        :select-target-asset="selectTargetAsset"
-        :select-custom-token="selectCustomToken"
-        :target-token-address="targetTokenAddress"
-        :copied-address="copiedAddress"
-        :shorten-address="shortenAddress"
-        :copy-address="copyAddress"
-        :resolved-custom-token="resolvedCustomToken"
-        :target-token-label="targetTokenLabel"
-        :is-checking-support="isCheckingSupport"
-        :supports-batching="supportsBatching"
-        :use-batching="useBatching"
-        :batch-method="batchMethod"
-        :owned-tokens="ownedTokensForTargetChain"
-        :native-token-logo-url="nativeTokenLogoUrl"
-        :needs-target-token-selection="needsTargetTokenSelection"
-        :dismiss-target-token-selection-prompt="dismissTargetTokenSelectionPrompt"
-        @update:show-target-chain-filter="showTargetChainFilter = $event"
-        @update:use-batching="useBatching = $event"
-        @update:show-route-details="showRouteDetails = $event"
+    <label
+      class="composer-widget__show-details-strip"
+      :class="{ 'composer-widget__show-details-strip--visible': selectedTokens.length > 0 }"
+    >
+      <input
+        :checked="showRouteDetails"
+        type="checkbox"
+        class="composer-widget__show-details-checkbox"
+        @change="showRouteDetails = ($event.target as HTMLInputElement).checked"
       />
+      <span class="composer-widget__show-details-text">Show details</span>
+    </label>
+
+    <div class="composer-widget__controls">
+      <div class="composer-widget__target-row">
+        <TxComposerComposerWidgetComposerTargetControls
+          :chains-by-balance="chainsByBalance"
+          :chain-balances="chainBalances"
+          :selected-target-chain-ids="selectedTargetChainIds"
+          :selected-target-chain-display="selectedTargetChainDisplay"
+          :show-target-chain-filter="showTargetChainFilter"
+          :is-target-chain-selected="isTargetChainSelected"
+          :on-toggle-target-chain="onToggleTargetChain"
+          :on-clear-target-chain="onClearTargetChain"
+          :target-chain-id="targetChainId"
+          :target-asset-mode="targetAssetMode"
+          :target-asset-options="targetAssetOptions"
+          :selected-target-option-id="selectedTargetOptionId"
+          :select-target-asset="selectTargetAsset"
+          :select-custom-token="selectCustomToken"
+          :target-token-address="targetTokenAddress"
+          :copied-address="copiedAddress"
+          :shorten-address="shortenAddress"
+          :copy-address="copyAddress"
+          :resolved-custom-token="resolvedCustomToken"
+          :target-token-label="targetTokenLabel"
+          :owned-tokens="ownedTokensForTargetChain"
+          :native-token-logo-url="nativeTokenLogoUrl"
+          :needs-target-token-selection="needsTargetTokenSelection"
+          :dismiss-target-token-selection-prompt="dismissTargetTokenSelectionPrompt"
+          @update:show-target-chain-filter="showTargetChainFilter = $event"
+        />
+        <div v-if="selectedTokens.length > 0" class="composer-widget__batch-on-row">
+          <div v-if="isCheckingSupport" class="composer-widget__checking-status">
+            <span class="composer-widget__checking-spinner"></span>
+            Checking…
+          </div>
+          <label v-else-if="supportsBatching" class="composer-widget__option-label">
+            <input
+              :checked="useBatching"
+              type="checkbox"
+              class="composer-widget__option-checkbox"
+              @change="useBatching = ($event.target as HTMLInputElement).checked"
+            />
+            <span>{{
+              batchMethod === 'eip7702' ? 'One-Click Mode (EIP-7702)' : 'Batch (EIP-5792)'
+            }}</span>
+          </label>
+        </div>
+      </div>
 
       <TxComposerComposerWidgetComposerBatchSettings
         :is-checking-support="isCheckingSupport"
@@ -440,6 +465,7 @@ const ownedTokensForTargetChain = computed(() => {
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 20px;
+  padding-right: 30px;
   position: sticky;
   top: 24px;
   max-height: calc(100vh - 48px);
@@ -454,6 +480,7 @@ const ownedTokensForTargetChain = computed(() => {
     top: 0;
     max-height: none;
     padding: 16px;
+    padding-right: 48px;
     border-radius: 14px;
   }
 
@@ -478,6 +505,120 @@ const ownedTokensForTargetChain = computed(() => {
   flex: 1;
   min-height: 0;
   overflow: visible;
+}
+
+.composer-widget__show-details-strip {
+  position: absolute;
+  top: 9rem;
+  right: 0;
+  bottom: 0;
+  width: 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 12px 0;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+  border-radius: 0 16px 16px 0;
+}
+
+.composer-widget__show-details-strip:hover,
+.composer-widget__show-details-strip--visible {
+  opacity: 1;
+}
+
+.composer-widget__show-details-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--accent-primary, mediumseagreen);
+  flex-shrink: 0;
+  order: 2;
+}
+
+.composer-widget__show-details-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  user-select: none;
+  order: 1;
+}
+
+.composer-widget__target-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.composer-widget__target-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-widget__batch-on-row {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+}
+
+.composer-widget__checking-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.composer-widget__checking-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: composer-widget-spin 1s linear infinite;
+}
+
+@keyframes composer-widget-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.composer-widget__option-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.composer-widget__option-label:hover {
+  background: var(--bg-hover);
+}
+
+.composer-widget__option-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--accent-primary, mediumseagreen);
+  flex-shrink: 0;
 }
 
 .composer-widget__execute-btn {

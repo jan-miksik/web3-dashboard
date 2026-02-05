@@ -79,7 +79,7 @@ const emit = defineEmits<{
 .total-value {
   font-size: 18px;
   font-weight: 700;
-  color: var(--accent-primary);
+  color: var(--usd-value-color);
   font-family: var(--font-mono);
 }
 

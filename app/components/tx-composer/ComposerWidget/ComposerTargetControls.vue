@@ -38,21 +38,10 @@ const props = defineProps<{
   // Resolved custom token (from dropdown preset or modal)
   resolvedCustomToken: ResolvedToken | null
   targetTokenLabel: string
-
-  // Batch settings
-  isCheckingSupport: boolean
-  supportsBatching: boolean | null
-  useBatching: boolean
-  batchMethod: string
-
-  // Route details toggle
-  showRouteDetails: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:show-target-chain-filter', v: boolean): void
-  (e: 'update:use-batching', v: boolean): void
-  (e: 'update:show-route-details', v: boolean): void
 }>()
 
 const chainsWithAssets = computed(() => props.chainsByBalance)
@@ -187,15 +176,6 @@ function onSelectChainFromModal(chainId: number | null) {
             />
           </svg>
         </button>
-        <label class="composer-target-controls__details-toggle">
-          <input
-            :checked="props.showRouteDetails"
-            type="checkbox"
-            class="composer-target-controls__details-toggle-input"
-            @change="emit('update:show-route-details', ($event.target as HTMLInputElement).checked)"
-          />
-          <span>Show details</span>
-        </label>
       </div>
 
       <div class="composer-target-controls__destination-row">
@@ -249,27 +229,6 @@ function onSelectChainFromModal(chainId: number | null) {
             @update:show-chain-filter="emit('update:show-target-chain-filter', $event)"
           />
         </div>
-
-        <div class="composer-target-controls__batch-wrap">
-          <div v-if="props.isCheckingSupport" class="composer-target-controls__checking-status">
-            <span class="composer-target-controls__checking-spinner"></span>
-            Checking wallet…
-          </div>
-          <label
-            v-else-if="props.supportsBatching"
-            class="composer-target-controls__checkbox-label"
-          >
-            <input
-              :checked="props.useBatching"
-              type="checkbox"
-              class="composer-target-controls__checkbox"
-              @change="emit('update:use-batching', ($event.target as HTMLInputElement).checked)"
-            />
-            <span>{{
-              props.batchMethod === 'eip7702' ? 'One-Click Mode (EIP-7702)' : 'Batch (EIP-5792)'
-            }}</span>
-          </label>
-        </div>
       </div>
     </div>
 
@@ -308,37 +267,11 @@ function onSelectChainFromModal(chainId: number | null) {
   flex-wrap: wrap;
 }
 
-.composer-target-controls__details-toggle {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--text-secondary);
-  user-select: none;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.composer-target-controls__details-toggle:hover {
-  background: var(--bg-hover);
-}
-
-.composer-target-controls__details-toggle-input {
-  margin: 0;
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-}
-
 .composer-target-controls__label {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-primary);
-  text-transform: uppercase;
 }
 
 .composer-target-controls__destination-row {
@@ -461,12 +394,6 @@ function onSelectChainFromModal(chainId: number | null) {
   text-overflow: ellipsis;
 }
 
-.composer-target-controls__batch-wrap {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 .composer-target-controls__token-address-btn {
   display: inline-flex;
   align-items: center;
@@ -509,14 +436,6 @@ function onSelectChainFromModal(chainId: number | null) {
   font-size: 12px;
 }
 
-@media (max-width: 768px) {
-  .composer-target-controls__checkbox-label {
-    min-height: 44px;
-    padding: 10px 0;
-    align-items: center;
-  }
-}
-
 @media (max-width: 520px) {
   .composer-target-controls__chain-wrap {
     flex: 1 1 100%;
@@ -525,62 +444,6 @@ function onSelectChainFromModal(chainId: number | null) {
   .composer-target-controls__destination-btn--selected {
     flex: 1 1 100%;
     max-width: 100%;
-  }
-}
-
-.composer-target-controls__checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-primary);
-  user-select: none;
-  padding: 4px 0;
-  white-space: nowrap;
-}
-
-.composer-target-controls__checkbox {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  margin: 0;
-  accent-color: var(--accent-primary, mediumseagreen);
-  border-radius: 4px;
-  border: 2px solid var(--border-color);
-  background: var(--bg-primary);
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-
-.composer-target-controls__checkbox:focus {
-  outline: 2px solid var(--accent-muted, rgba(60, 179, 113, 0.3));
-  outline-offset: 2px;
-}
-
-.composer-target-controls__checking-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  padding: 4px 0;
-  white-space: nowrap;
-}
-
-.composer-target-controls__checking-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--text-primary);
-  border-radius: 50%;
-  animation: composer-target-controls-spin 1s linear infinite;
-}
-
-@keyframes composer-target-controls-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 </style>

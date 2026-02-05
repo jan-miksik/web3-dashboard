@@ -803,7 +803,7 @@ const txKey = (tx: AppTxRecord) => `${tx.hash}-${tx.chainId}`
 .transaction-history-box__summary-usd {
   font-size: 14px;
   font-weight: 600;
-  color: var(--success);
+  color: var(--usd-value-color);
 }
 
 .transaction-history-box__summary-usd--sent {
@@ -936,7 +936,7 @@ const txKey = (tx: AppTxRecord) => `${tx.hash}-${tx.chainId}`
 }
 
 .transaction-history-box__sent-tooltip-usd {
-  color: var(--text-secondary);
+  color: var(--usd-value-color);
   font-size: 11px;
   margin-left: 4px;
 }
@@ -1142,7 +1142,7 @@ const txKey = (tx: AppTxRecord) => `${tx.hash}-${tx.chainId}`
 
 .transaction-history-box__leg-amount-usd {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--usd-value-color);
 }
 
 .transaction-history-box__leg-amount--to {

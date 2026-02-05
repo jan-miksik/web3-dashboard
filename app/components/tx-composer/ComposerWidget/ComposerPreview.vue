@@ -474,7 +474,6 @@ function onApplyDefaultPercentToAllSelected() {
   font-size: 16px;
   color: var(--text-primary);
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
@@ -816,15 +815,16 @@ function onApplyDefaultPercentToAllSelected() {
   display: flex;
   align-items: baseline;
   gap: 2px;
-  font-size: 13px;
-  font-weight: 600;
-  color: mediumseagreen;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--usd-value-color);
   white-space: nowrap;
 }
 
 .composer-preview__usd-sub-decimals {
   font-size: 0.9em;
-  opacity: 0.8;
+  opacity: 0.85;
+  color: var(--usd-value-color);
 }
 
 .composer-preview__output-amount {

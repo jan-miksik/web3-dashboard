@@ -80,7 +80,6 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
 .composer-summary__label {
   font-size: 12px;
   color: var(--text-secondary);
-  text-transform: uppercase;
   margin-bottom: 2px;
   letter-spacing: 0.05em;
 }
@@ -110,19 +109,19 @@ const totalValueOutParts = computed(() => formatUsdValueParts(props.totalValueOu
 }
 
 .composer-summary__usd-value {
-  color: mediumseagreen;
+  color: var(--usd-value-color);
 }
 
 .composer-summary__usd-value-inline {
   font-size: 16px;
-  color: mediumseagreen;
+  color: var(--usd-value-color);
   font-weight: 600;
   margin-left: 2px;
 }
 
 .composer-summary__usd-sub-decimals {
   font-size: 16px;
-  color: var(--text-muted);
+  color: var(--usd-value-color);
   opacity: 0.85;
   font-weight: 600;
 }
